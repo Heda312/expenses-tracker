@@ -146,4 +146,58 @@
     };
     reader.readAsDataURL(file);
   }
+
+  // Save OCR preview to transaction
+  var saveUploadBtn = document.getElementById("save-upload-btn");
+  if (saveUploadBtn) {
+    saveUploadBtn.addEventListener("click", function () {
+      var amount = document.getElementById("preview-amount").value;
+      var merchant = document.getElementById("preview-merchant").value;
+      var occurred_at = document.getElementById("preview-date").value;
+      var category_id = document.getElementById("preview-category").value;
+      var account_id = document.getElementById("preview-account").value;
+
+      // Validate required fields
+      if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
+        alert("Nominal wajib diisi dan harus > 0");
+        return;
+      }
+      if (!merchant || merchant.trim().length === 0) {
+        alert("Nama merchant/warung wajib diisi");
+        return;
+      }
+      if (!occurred_at) {
+        alert("Tanggal transaksi wajib diisi");
+        return;
+      }
+      if (!category_id || category_id === "0") {
+        alert("Kategori wajib dipilih");
+        return;
+      }
+      if (!account_id || account_id === "0") {
+        alert("Dompet sumber wajib dipilih");
+        return;
+      }
+
+      // Create transaction via form submission
+      var form = document.getElementById("tx-form");
+      if (!form) {
+        alert("Form transaksi tidak ditemukan");
+        return;
+      }
+
+      form.reset();
+      form.action = "/transactions/create";
+      form.elements["amount"].value = amount;
+      form.elements["merchant"].value = merchant;
+      form.elements["occurred_at"].value = occurred_at;
+      form.elements["category_id"].value = category_id;
+      form.elements["account_id"].value = account_id;
+      form.elements["kind"].value = "expense";
+
+      closeUploadPreview();
+      dialog.showModal();
+      form.elements["note"].focus();
+    });
+  }
 })();
