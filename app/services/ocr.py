@@ -86,21 +86,23 @@ def _preprocess(image_bytes: bytes):
 
 def read_lines(image_bytes: bytes) -> list[dict]:
     """Baca gambar, kembalikan daftar baris teks beserta posisinya."""
+    all_lines = []
+    # Try raw image first (more lenient)
+    try:
+        all_lines = _run_ocr(image_bytes)
+        if len(all_lines) >= 3:
+            return all_lines
+    except Exception:
+        pass
+
     try:
         img = _preprocess(image_bytes)
-        lines = _run_ocr(img)
-        if len(lines) >= 5:
-            return lines
+        all_lines = _run_ocr(img)
+        if len(all_lines) >= 3:
+            return all_lines
     except Exception:
         pass
 
-    try:
-        lines = _run_ocr(image_bytes)
-        if len(lines) >= 5:
-            return lines
-    except Exception:
-        pass
-
-    if not lines:
+    if not all_lines:
         raise OcrError("Tidak ada teks yang terbaca dari gambar ini.")
-    return lines
+    return all_lines

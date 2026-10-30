@@ -26,16 +26,38 @@
     </div>
   </dialog>
 
+  <!-- Custom Alert Modal -->
+  <dialog id="alert-dialog">
+    <div class="dialog-head">
+      <h2>Peringatan</h2>
+      <button class="btn btn-icon btn-ghost" type="button" onclick="closeAlertDialog()" aria-label="Tutup">&times;</button>
+    </div>
+    <div class="dialog-body">
+      <div id="alert-content" class="muted"></div>
+    </div>
+    <div class="dialog-foot">
+      <button class="btn btn-primary" type="button" onclick="closeAlertDialog()">OK</button>
+    </div>
+  </dialog>
+
   <!-- Upload Preview Modal -->
   <dialog id="upload-preview-dialog">
     <div class="dialog-head">
       <h2>Preview Struk</h2>
       <button class="btn btn-icon btn-ghost" type="button" onclick="closeUploadPreview()" aria-label="Tutup">&times;</button>
     </div>
-    <div class="dialog-body" style="display:flex;flex-direction:column;gap:12px;align-items:center">
+    <!-- Loading overlay -->
+    <div id="upload-loading" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:10">
+      <div style="color:white;font-size:16px">
+        <div class="spinner" style="width:40px;height:40px;border:4px solid rgba(255,255,255,0.3);border-radius:50%;border-top-color:#fff;animation:spin 1s linear infinite;margin:0 auto 10px"></div>
+        Memindai struk...
+      </div>
+    </div>
+    <div class="dialog-body" style="display:flex;flex-direction:column;gap:12px;align-items:center;position:relative">
       <img id="preview-image" src="" alt="" style="max-width:100%;border-radius:10px;border:1px solid var(--line)">
       <div style="width:100%">
         <div id="preview-text" class="muted" style="font-size:12.5px;white-space:pre-wrap"></div>
+        <div id="preview-errors" class="alert alert-error" style="display:none;margin-top:6px"></div>
         <div style="margin-top:6px">
           <label class="hint">Nominal</label>
           <input id="preview-amount" inputmode="numeric" style="width:100%">
@@ -57,7 +79,7 @@
         </div>
         <div style="margin-top:6px">
           <label class="hint">Dompet</label>
-          <select id="preview-account" style="width:1000%">
+          <select id="preview-account" style="width:100%">
             {% for account in accounts %}<option value="{{ account.id }}">{{ account.name }}{% if account.archived %} (arsip){% endif %}</option>{% endfor %}
           </select>
         </div>

@@ -22,6 +22,10 @@ async def ocr_endpoint(
         return JSONResponse({"error": "Invalid file type"}, status_code=400)
 
     content = await file.read()
+    
+    if len(content) == 0:
+        return JSONResponse({"error": "File kosong"}, status_code=400)
+    
     try:
         lines = await asyncio.to_thread(ocr.read_lines, content)
     except ocr.OcrError as exc:

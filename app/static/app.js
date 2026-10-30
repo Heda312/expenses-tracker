@@ -24,10 +24,18 @@
 
   var form = document.getElementById("tx-form");
   var title = document.getElementById("tx-dialog-title");
+  var kindSelect = document.getElementById("tx-kind");
   var transferGroup = document.getElementById("transfer-group");
 
   function applyKind(kind) {
     transferGroup.hidden = kind !== "transfer";
+  }
+
+  // Toggle "Ke dompet" field when kind changes
+  if (kindSelect) {
+    kindSelect.addEventListener("change", function () {
+      applyKind(this.value);
+    });
   }
 
   window.openTxCreate = function () {
@@ -80,6 +88,30 @@
     if (uploadPreviewDialog) {
       uploadPreviewDialog.close();
     }
+    // Hide loading overlay
+    var loading = document.getElementById("upload-loading");
+    if (loading) {
+      loading.style.display = "none";
+    }
+  };
+
+  // Custom alert modal
+  var alertDialog = document.getElementById("alert-dialog");
+  var alertContent = document.getElementById("alert-content");
+
+  window.showAlert = function (message) {
+    if (!alertDialog || !alertContent) {
+      alert(message);
+      return;
+    }
+    alertContent.textContent = message;
+    alertDialog.showModal();
+  };
+
+  window.closeAlertDialog = function () {
+    if (alertDialog) {
+      alertDialog.close();
+    }
   };
 
   // Hidden file input for OCR (created on first click to ensure DOM ready)
@@ -107,12 +139,18 @@
     var reader = new FileReader();
     reader.onload = function (e) {
       document.getElementById("preview-image").src = e.target.result;
-      document.getElementById("preview-text").textContent = "Membaca struk...";
+      document.getElementById("preview-text").textContent = "";
       document.getElementById("preview-amount").value = "";
       document.getElementById("preview-merchant").value = "";
       document.getElementById("preview-date").value = "";
       document.getElementById("preview-category").selectedIndex = 0;
       document.getElementById("preview-account").selectedIndex = 0;
+
+      // Show loading overlay
+      var loading = document.getElementById("upload-loading");
+      if (loading) {
+        loading.style.display = "flex";
+      }
 
       var formData = new FormData();
       formData.append("file", file);
@@ -138,9 +176,16 @@
           if (data.account_id) {
             document.getElementById("preview-account").value = data.account_id;
           }
+          // Hide loading before showing modal
+          if (loading) {
+            loading.style.display = "none";
+          }
           uploadPreviewDialog.showModal();
         })
         .catch(function (err) {
+          if (loading) {
+            loading.style.display = "none";
+          }
           document.getElementById("preview-text").textContent = "OCR gagal: " + err.message;
         });
     };
@@ -151,53 +196,68 @@
   var saveUploadBtn = document.getElementById("save-upload-btn");
   if (saveUploadBtn) {
     saveUploadBtn.addEventListener("click", function () {
-      var amount = document.getElementById("preview-amount").value;
-      var merchant = document.getElementById("preview-merchant").value;
-      var occurred_at = document.getElementById("preview-date").value;
-      var category_id = document.getElementById("preview-category").value;
-      var account_id = document.getElementById("preview-account").value;
-
-      // Validate required fields
-      if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
-        alert("Nominal wajib diisi dan harus > 0");
-        return;
-      }
-      if (!merchant || merchant.trim().length === 0) {
-        alert("Nama merchant/warung wajib diisi");
-        return;
-      }
-      if (!occurred_at) {
-        alert("Tanggal transaksi wajib diisi");
-        return;
-      }
-      if (!category_id || category_id === "0") {
-        alert("Kategori wajib dipilih");
-        return;
-      }
-      if (!account_id || account_id === "0") {
-        alert("Dompet sumber wajib dipilih");
+      var validated = validatePreviewForm();
+      if (!validated) {
         return;
       }
 
       // Create transaction via form submission
       var form = document.getElementById("tx-form");
       if (!form) {
-        alert("Form transaksi tidak ditemukan");
+        showAlert("Form transaksi tidak ditemukan");
         return;
       }
 
       form.reset();
       form.action = "/transactions/create";
-      form.elements["amount"].value = amount;
-      form.elements["merchant"].value = merchant;
-      form.elements["occurred_at"].value = occurred_at;
-      form.elements["category_id"].value = category_id;
-      form.elements["account_id"].value = account_id;
+      form.elements["amount"].value = validated.amount;
+      form.elements["merchant"].value = validated.merchant;
+      form.elements["occurred_at"].value = validated.occurred_at;
+      form.elements["category_id"].value = validated.category_id;
+      form.elements["account_id"].value = validated.account_id;
       form.elements["kind"].value = "expense";
 
       closeUploadPreview();
       dialog.showModal();
       form.elements["note"].focus();
     });
+  }
+
+  // Validation for OCR preview — show popup alert
+  function validatePreviewForm() {
+    var errors = [];
+    var amount = document.getElementById("preview-amount").value;
+    var merchant = document.getElementById("preview-merchant").value;
+    var occurred_at = document.getElementById("preview-date").value;
+    var category_id = document.getElementById("preview-category").value;
+    var account_id = document.getElementById("preview-account").value;
+
+    if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
+      errors.push("Nominal harus > 0");
+    }
+    if (!merchant || merchant.trim().length === 0) {
+      errors.push("Nama merchant/warung wajib diisi");
+    }
+    if (!occurred_at) {
+      errors.push("Tanggal transaksi wajib diisi");
+    }
+    if (!category_id || category_id === "0") {
+      errors.push("Kategori wajib dipilih");
+    }
+    if (!account_id || account_id === "0") {
+      errors.push("Dompet sumber wajib dipilih");
+    }
+
+    if (errors.length > 0) {
+      showAlert(errors.join("\n"));
+      return null;
+    }
+    return {
+      amount: parseFloat(amount),
+      merchant: merchant.trim(),
+      occurred_at: occurred_at,
+      category_id: parseInt(category_id, 10),
+      account_id: parseInt(account_id, 10),
+    };
   }
 })();
