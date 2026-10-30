@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Dompet · {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Dompet</h1>
+    <p class="muted">Total saldo {{ format_idr(total_balance) }}</p>
+  </div>
+</div>
+
+<section class="grid-2">
+  <div class="stack">
+    {% for account in accounts %}
+      <div class="card account-card {% if account.archived %}is-archived{% endif %}">
+        <div class="account-head">
+          <div>
+            <div class="cell-title">{{ account.name }}</div>
+            <div class="cell-sub">
+              {% if account.kind == 'cash' %}Tunai{% elif account.kind == 'bank' %}Bank{% else %}E-wallet{% endif %}
+              {% if account.archived %} &middot; diarsipkan{% endif %}
+            </div>
+          </div>
+          <div class="account-balance num">{{ format_idr(balances.get(account.id, 0)) }}</div>
+        </div>
+
+        <form method="post" action="/accounts/{{ account.id }}/update" class="form-grid">
+          <div class="form-row">
+            <div class="field">
+              <label for="name-{{ account.id }}">Nama</label>
+              <input id="name-{{ account.id }}" name="name" value="{{ account.name }}" maxlength="80" required>
+            </div>
+            <div class="field">
+              <label for="kind-{{ account.id }}">Jenis</label>
+              <select id="kind-{{ account.id }}" name="kind">
+                <option value="cash" {% if account.kind == 'cash' %}selected{% endif %}>Tunai</option>
+                <option value="bank" {% if account.kind == 'bank' %}selected{% endif %}>Bank</option>
+                <option value="ewallet" {% if account.kind == 'ewallet' %}selected{% endif %}>E-wallet</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="balance-{{ account.id }}">Saldo awal</label>
+              <input id="balance-{{ account.id }}" name="opening_balance" value="{{ account.opening_balance }}" inputmode="numeric">
+            </div>
+          </div>
+          <div class="row-actions">
+            <button class="btn btn-sm" type="submit">Simpan</button>
+          </div>
+        </form>
+
+        <form method="post" action="/accounts/{{ account.id }}/archive" class="inline-form">
+          <button class="btn btn-sm btn-ghost" type="submit">
+            {% if account.archived %}Aktifkan kembali{% else %}Arsipkan{% endif %}
+          </button>
+        </form>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div>
+        <h2 class="card-title">Tambah dompet</h2>
+        <p class="card-sub">Tunai, rekening bank, atau e-wallet</p>
+      </div>
+    </div>
+
+    <form method="post" action="/accounts/create" class="form-grid">
+      <div class="field">
+        <label for="new-name">Nama</label>
+        <input id="new-name" name="name" maxlength="80" placeholder="BCA" required>
+      </div>
+      <div class="field">
+        <label for="new-kind">Jenis</label>
+        <select id="new-kind" name="kind">
+          <option value="cash">Tunai</option>
+          <option value="bank">Bank</option>
+          <option value="ewallet">E-wallet</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="new-balance">Saldo awal</label>
+        <input id="new-balance" name="opening_balance" value="0" inputmode="numeric">
+      </div>
+      <button class="btn btn-primary" type="submit">Tambah</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

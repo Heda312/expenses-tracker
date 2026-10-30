@@ -1,0 +1,35 @@
+# Environment
+.venv
+.env
+.env.local
+.env.*.local
+
+# Data & uploads
+data/
+!data/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE & editor
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Docker
+.dockerignore

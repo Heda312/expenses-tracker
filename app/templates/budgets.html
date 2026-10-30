@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Budget · {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Budget</h1>
+    <p class="muted">Batas pengeluaran {{ period_label(period) }}</p>
+  </div>
+  <div class="period-nav">
+    <a class="btn btn-icon" href="/budgets?period={{ prev_period }}" aria-label="Bulan sebelumnya">&lsaquo;</a>
+    <span class="pill">{{ period_label(period) }}</span>
+    <a class="btn btn-icon" href="/budgets?period={{ next_period }}" aria-label="Bulan berikutnya">&rsaquo;</a>
+  </div>
+</div>
+
+<section class="grid-2">
+  <div class="card">
+    <div class="card-head">
+      <div>
+        <h2 class="card-title">Pemakaian</h2>
+        <p class="card-sub">Melewati batas akan ditandai merah</p>
+      </div>
+    </div>
+
+    {% if progress %}
+      <div class="stack">
+        {% for item in progress %}
+          <div class="budget-row">
+            <div class="budget-head">
+              <span class="legend-name">{{ item.name }}</span>
+              <span class="num muted">{{ format_idr(item.spent) }} / {{ format_idr(item.amount) }}</span>
+            </div>
+            <div class="bar {% if item.over %}over{% endif %}">
+              <span style="width: {{ item.pct if item.pct < 100 else 100 }}%"></span>
+            </div>
+            <div class="budget-foot">
+              <span class="cell-sub">
+                {% if item.over %}
+                  Lebih {{ format_idr(-item.remaining) }}
+                {% else %}
+                  Sisa {{ format_idr(item.remaining) }}
+                {% endif %}
+                &middot; {{ item.pct }}%
+              </span>
+              <form method="post" action="/budgets/{{ item.id }}/delete" onsubmit="return confirm('Hapus budget ini?')">
+                <input type="hidden" name="period" value="{{ period }}">
+                <button class="btn btn-sm btn-ghost btn-danger" type="submit">Hapus</button>
+              </form>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty">
+        <strong>Belum ada budget</strong>
+        Tambahkan batas pengeluaran untuk kategori tertentu.
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div>
+        <h2 class="card-title">Atur budget</h2>
+        <p class="card-sub">Menyimpan ulang akan memperbarui nilainya</p>
+      </div>
+    </div>
+
+    <form method="post" action="/budgets/save" class="form-grid">
+      <div class="field">
+        <label for="budget-category">Kategori</label>
+        <select id="budget-category" name="category_id" required>
+          {% for category in categories %}
+            <option value="{{ category.id }}">{{ category.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="budget-amount">Batas per bulan</label>
+        <input id="budget-amount" name="amount" inputmode="numeric" placeholder="1.500.000" required>
+      </div>
+      <input type="hidden" name="period" value="{{ period }}">
+      <button class="btn btn-primary" type="submit">Simpan budget</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

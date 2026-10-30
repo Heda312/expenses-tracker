@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}Hasil Baca Struk · {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Hasil Baca Struk</h1>
+    <p class="muted">Cek hasil OCR, perbaiki kalau ada yang salah, lalu simpan</p>
+  </div>
+  <div class="row-actions">
+    <a class="btn" href="/transactions?period={{ period }}">Kembali ke daftar</a>
+  </div>
+</div>
+
+<section class="grid-2">
+  <div class="stack">
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2 class="card-title">Draft Transaksi</h2>
+          <p class="card-sub">Status: Menunggu konfirmasi</p>
+        </div>
+        <div class="row-actions">
+          {% if item.status == 'pending' %}
+          <form method="post" action="/transactions/{{ item.id }}/confirm">
+            <input type="hidden" name="period" value="{{ period }}">
+            <button class="btn btn-primary" type="submit">Simpan ke Laporan</button>
+          </form>
+          {% endif %}
+          <form method="post" action="/transactions/{{ item.id }}/delete" onsubmit="return confirm('Hapus draft ini?')">
+            <input type="hidden" name="period" value="{{ period }}">
+            <button class="btn btn-ghost btn-danger" type="submit">Hapus</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="info-list">
+        <div class="info-row">
+          <span>Nominal</span>
+          <span class="num">{{ format_idr(item.amount) }}</span>
+        </div>
+        <div class="info-row">
+          <span>Merchant</span>
+          <span>{{ item.merchant or '-' }}</span>
+        </div>
+        <div class="info-row">
+          <span>Kategori</span>
+          <span>{{ item.category.name if item.category else 'Tanpa kategori' }} {% if item.category_source %}({{ item.category_source }}){% endif %}</span>
+        </div>
+        <div class="info-row">
+          <span>Dompet</span>
+          <span>{{ item.account.name if item.account else '-' }}</span>
+        </div>
+        <div class="info-row">
+          <span>Waktu</span>
+          <span>{{ format_dt(item.occurred_at) }}</span>
+        </div>
+        <div class="info-row">
+          <span>Keyakinan OCR</span>
+          <span>{{ (item.confidence * 100)|round(0) if item.confidence is not none else '-' }}%</span>
+        </div>
+        <div class="info-row">
+          <span>Sumber</span>
+          <span>{{ item.source }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2 class="card-title">Edit Draft</h2>
+          <p class="card-sub">Bisa langsung kamu benerin disini</p>
+        </div>
+      </div>
+
+      <form method="post" action="/transactions/{{ item.id }}/update" class="form-grid">
+        <input type="hidden" name="period" value="{{ period }}">
+        <div class="form-row">
+          <div class="field">
+            <label for="kind">Jenis</label>
+            <select id="kind" name="kind">
+              <option value="expense" {% if item.kind=='expense' %}selected{% endif %}>Pengeluaran</option>
+              <option value="income" {% if item.kind=='income' %}selected{% endif %}>Pemasukan</option>
+              <option value="transfer" {% if item.kind=='transfer' %}selected{% endif %}>Transfer</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="amount">Nominal</label>
+            <input id="amount" name="amount" value="{{ item.amount }}" inputmode="numeric" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="field">
+            <label for="account_id">Dompet</label>
+            <select id="account_id" name="account_id" required>
+              {% for account in accounts %}
+              <option value="{{ account.id }}" {% if item.account_id == account.id %}selected{% endif %}>{{ account.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label for="category_id">Kategori</label>
+            <select id="category_id" name="category_id">
+              <option value="">Tanpa kategori</option>
+              {% for category in categories %}
+              <option value="{{ category.id }}" {% if item.category_id == category.id %}selected{% endif %}>{{ category.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="merchant">Merchant</label>
+          <input id="merchant" name="merchant" value="{{ item.merchant or '' }}">
+        </div>
+        <div class="field">
+          <label for="note">Catatan</label>
+          <input id="note" name="note" value="{{ item.note or '' }}">
+        </div>
+        <div class="field">
+          <label for="occurred_at">Waktu</label>
+          <input id="occurred_at" name="occurred_at" type="datetime-local" value="{{ occurred_at_local }}">
+        </div>
+        <input type="hidden" name="to_account_id" value="">
+        <button class="btn btn-primary" type="submit">Simpan Perubahan</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="stack">
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2 class="card-title">Gambar Struk</h2>
+          <p class="card-sub">File yang diupload</p>
+        </div>
+      </div>
+      {% if item.image_path %}
+      <a href="/{{ item.image_path }}" target="_blank" rel="noopener">
+        <img src="/{{ item.image_path }}" alt="Struk" style="width:100%;border-radius:12px;border:1px solid var(--line);">
+      </a>
+      <p class="hint">Klik gambar buat buka ukuran penuh</p>
+      {% else %}
+      <div class="empty"><strong>Tidak ada gambar</strong></div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2 class="card-title">Teks Hasil OCR</h2>
+          <p class="card-sub">Baris yang berhasil dibaca</p>
+        </div>
+      </div>
+      <pre style="white-space:pre-wrap;background:#0d1117;border:1px solid var(--line);border-radius:12px;padding:14px;font-size:12px;line-height:1.7;overflow:auto;max-height:420px;">{{ item.raw_text or '(kosong)' }}</pre>
+      <p class="hint">Kalo totalnya nggak kebaca, ubah nominal manual terus simpan.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>{% block title %}{{ app_name }}{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <div class="brand-name">
+        <span>{{ app_name }}</span>
+        <span class="brand-sub">Pengeluaran Pribadi</span>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <a class="nav-link {% if page_name == 'dashboard' %}active{% endif %}" href="/">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3.5" y="3.5" width="7" height="7" rx="2"/>
+          <rect x="13.5" y="3.5" width="7" height="7" rx="2"/>
+          <rect x="3.5" y="13.5" width="7" height="7" rx="2"/>
+          <rect x="13.5" y="13.5" width="7" height="7" rx="2"/>
+        </svg>
+        <span>Dashboard</span>
+      </a>
+      <a class="nav-link {% if page_name == 'transactions' %}active{% endif %}" href="/transactions">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 6.5h16"/>
+          <path d="M4 12h16"/>
+          <path d="M4 17.5h10"/>
+        </svg>
+        <span>Transaksi</span>
+      </a>
+      <a class="nav-link {% if page_name == 'accounts' %}active{% endif %}" href="/accounts">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3.5" y="6" width="17" height="12" rx="3"/>
+          <path d="M3.5 10h17"/>
+          <circle cx="16.5" cy="15" r="1"/>
+        </svg>
+        <span>Dompet</span>
+      </a>
+      <a class="nav-link {% if page_name == 'budgets' %}active{% endif %}" href="/budgets">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="8"/>
+          <path d="M12 12 15.5 8.5"/>
+          <circle cx="12" cy="12" r="1.8"/>
+        </svg>
+        <span>Budget</span>
+      </a>
+      <a class="nav-link {% if page_name == 'settings' %}active{% endif %}" href="/settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="2.2"/>
+          <path d="M12 4v2.2M12 17.8V20M4 12h2.2M17.8 12H20M6.4 6.4l1.6 1.6M16 16l1.6 1.6M6.4 17.6 8 16M16 8l1.6-1.6"/>
+        </svg>
+        <span>Pengaturan</span>
+      </a>
+    </nav>
+
+    <form class="sidebar-footer" method="post" action="/logout">
+      <button class="btn btn-ghost btn-block" type="submit">Keluar</button>
+    </form>
+  </aside>
+
+  <main class="main">
+    {% set flash_key = request.query_params.get('flash') %}
+    {% if flash_key and flash_key in flash_messages %}
+      {% set flash_kind, flash_text = flash_messages[flash_key] %}
+      <div class="flash {{ flash_kind }}">{{ flash_text }}</div>
+    {% endif %}
+
+    {% block content %}{% endblock %}
+  </main>
+</div>
+<script src="/static/app.js"></script>
+</body>
+</html>

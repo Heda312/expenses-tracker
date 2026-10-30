@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+{% block title %}Transaksi · {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Transaksi</h1>
+    <p class="muted">{{ total }} transaksi ditemukan</p>
+  </div>
+  <div class="row-actions">
+    <button class="btn btn-primary" type="button" onclick="openPicker()">Tambah</button>
+    {% if period != 'all' %}
+      <a class="btn" href="/export.xlsx?period={{ period }}">Export Excel</a>
+    {% endif %}
+  </div>
+
+  <!-- Picker Modal -->
+  <dialog id="picker-dialog">
+    <div class="dialog-head">
+      <h2>Tambah Transaksi</h2>
+      <button class="btn btn-icon btn-ghost" type="button" onclick="closePicker()" aria-label="Tutup">&times;</button>
+    </div>
+    <div class="dialog-body" style="display:flex;flex-direction:column;gap:12px">
+      <button class="btn btn-primary" type="button" onclick="openUpload()">Upload Struk</button>
+      <button class="btn btn-ghost" type="button" onclick="openTxCreate();closePicker()">Manual</button>
+    </div>
+  </dialog>
+
+  <!-- Upload Preview Modal -->
+  <dialog id="upload-preview-dialog">
+    <div class="dialog-head">
+      <h2>Preview Struk</h2>
+      <button class="btn btn-icon btn-ghost" type="button" onclick="closeUploadPreview()" aria-label="Tutup">&times;</button>
+    </div>
+    <div class="dialog-body" style="display:flex;flex-direction:column;gap:12px;align-items:center">
+      <img id="preview-image" src="" alt="" style="max-width:100%;border-radius:10px;border:1px solid var(--line)">
+      <div style="width:100%">
+        <div id="preview-text" class="muted" style="font-size:12.5px;white-space:pre-wrap"></div>
+        <div style="margin-top:6px">
+          <label class="hint">Nominal</label>
+          <input id="preview-amount" inputmode="numeric" style="width:100%">
+        </div>
+        <div style="margin-top:6px">
+          <label class="hint">Merchant</label>
+          <input id="preview-merchant" maxlength="120" style="width:100%">
+        </div>
+        <div style="margin-top:6px">
+          <label class="hint">Waktu</label>
+          <input id="preview-date" type="datetime-local" style="width:100%">
+        </div>
+        <div style="margin-top:6px">
+          <label class="hint">Kategori</label>
+          <select id="preview-category" style="width:100%">
+            <option value="">Tanpa kategori</option>
+            {% for category in categories %}<option value="{{ category.id }}">{{ category.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div style="margin-top:6px">
+          <label class="hint">Dompet</label>
+          <select id="preview-account" style="width:1000%">
+            {% for account in accounts %}<option value="{{ account.id }}">{{ account.name }}{% if account.archived %} (arsip){% endif %}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="dialog-foot">
+      <button class="btn btn-ghost" type="button" onclick="closeUploadPreview()">Batal</button>
+      <button class="btn btn-primary" type="button" id="save-upload-btn">Simpan</button>
+    </div>
+  </dialog>
+</div>
+
+<form class="card filters" method="get" action="/transactions">
+  <div class="field">
+    <label for="f-period">Bulan</label>
+    <input id="f-period" type="month" name="period" value="{{ '' if period == 'all' else period }}">
+  </div>
+  <div class="field">
+    <label for="f-account">Dompet</label>
+    <select id="f-account" name="account_id">
+      <option value="">Semua</option>
+      {% for account in accounts %}
+        <option value="{{ account.id }}" {% if account_id == account.id|string %}selected{% endif %}>{{ account.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="field">
+    <label for="f-category">Kategori</label>
+    <select id="f-category" name="category_id">
+      <option value="">Semua</option>
+      {% for category in categories %}
+        <option value="{{ category.id }}" {% if category_id == category.id|string %}selected{% endif %}>{{ category.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="field">
+    <label for="f-q">Cari</label>
+    <input id="f-q" name="q" value="{{ q }}" placeholder="merchant atau catatan">
+  </div>
+  <div class="row-actions">
+    <a class="btn btn-ghost" href="/transactions?period=all">Semua waktu</a>
+    <button class="btn" type="submit">Terapkan</button>
+  </div>
+</form>
+
+<div class="card table-card">
+  {% if rows %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Tanggal</th>
+            <th>Keterangan</th>
+            <th>Dompet</th>
+            <th class="right">Nominal</th>
+            <th class="right">Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+            {% set item = row.tx %}
+            <tr class="{% if item.status == 'pending' %}row-pending{% endif %}">
+              <td class="nowrap">
+                <div>{{ format_dt(item.occurred_at) }}</div>
+                {% if item.status == 'pending' %}<span class="badge badge-pending">Menunggu</span>{% endif %}
+              </td>
+              <td>
+                <div class="cell-title">{{ item.merchant or item.note or '-' }}</div>
+                <div class="cell-sub">
+                  {{ item.category.name if item.category else 'Tanpa kategori' }}
+                  {% if item.kind == 'transfer' and item.to_account %}
+                    &middot; transfer ke {{ item.to_account.name }}
+                  {% endif %}
+                </div>
+              </td>
+              <td>{{ item.account.name if item.account else '-' }}</td>
+              <td class="right num {% if item.kind == 'expense' %}amount-expense{% elif item.kind == 'income' %}amount-income{% endif %}">
+                {% if item.kind == 'expense' %}-{% elif item.kind == 'income' %}+{% endif %}{{ format_idr(item.amount) }}
+              </td>
+              <td>
+                <div class="row-actions end">
+                  {% if item.status == 'pending' %}
+                    <form method="post" action="/transactions/{{ item.id }}/confirm">
+                      <input type="hidden" name="period" value="{{ period }}">
+                      <button class="btn btn-sm btn-primary" type="submit">Simpan</button>
+                    </form>
+                  {% endif %}
+                  <button class="btn btn-sm btn-ghost" type="button"
+                          data-tx='{{ row.form | tojson }}'
+                          onclick="openTxEdit(this)">Ubah</button>
+                  <form method="post" action="/transactions/{{ item.id }}/delete"
+                        onsubmit="return confirm('Hapus transaksi ini?')">
+                    <input type="hidden" name="period" value="{{ period }}">
+                    <button class="btn btn-sm btn-ghost btn-danger" type="submit">Hapus</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if pages > 1 %}
+      {% set query = 'period=' ~ period ~ '&q=' ~ (q | urlencode) ~ '&account_id=' ~ account_id ~ '&category_id=' ~ category_id %}
+      <div class="pagination">
+        <span>Halaman {{ page }} dari {{ pages }}</span>
+        <div class="row-actions">
+          {% if page > 1 %}
+            <a class="btn btn-sm btn-ghost" href="/transactions?{{ query }}&page={{ page - 1 }}">Sebelumnya</a>
+          {% endif %}
+          {% if page < pages %}
+            <a class="btn btn-sm btn-ghost" href="/transactions?{{ query }}&page={{ page + 1 }}">Berikutnya</a>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+  {% else %}
+    <div class="empty">
+      <strong>Belum ada transaksi</strong>
+      Kirim foto struk ke bot Telegram, atau tekan tombol Tambah.
+    </div>
+  {% endif %}
+</div>
+
+<dialog id="tx-dialog">
+  <form id="tx-form" method="post" action="/transactions/create" data-default-occurred="{{ default_occurred }}">
+    <div class="dialog-head">
+      <h2 id="tx-dialog-title">Transaksi baru</h2>
+      <button class="btn btn-icon btn-ghost" type="button" onclick="closeTxDialog()" aria-label="Tutup">&times;</button>
+    </div>
+
+    <div class="dialog-body form-grid">
+      <div class="field">
+        <label for="tx-kind">Jenis</label>
+        <select id="tx-kind" name="kind">
+          <option value="expense">Pengeluaran</option>
+          <option value="income">Pemasukan</option>
+          <option value="transfer">Transfer antar dompet</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <div class="field">
+          <label for="tx-amount">Nominal</label>
+          <input id="tx-amount" name="amount" inputmode="numeric" placeholder="47.500" required>
+        </div>
+        <div class="field">
+          <label for="tx-date">Waktu</label>
+          <input id="tx-date" name="occurred_at" type="datetime-local" required>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="field">
+          <label for="tx-account">Dompet</label>
+          <select id="tx-account" name="account_id">
+            {% for account in accounts %}
+              <option value="{{ account.id }}">{{ account.name }}{% if account.archived %} (arsip){% endif %}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field" id="transfer-group" hidden>
+          <label for="tx-to-account">Ke dompet</label>
+          <select id="tx-to-account" name="to_account_id">
+            <option value="">Pilih dompet</option>
+            {% for account in accounts %}
+              <option value="{{ account.id }}">{{ account.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="tx-category">Kategori</label>
+        <select id="tx-category" name="category_id">
+          <option value="">Tanpa kategori</option>
+          {% for category in categories %}
+            <option value="{{ category.id }}">{{ category.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="tx-merchant">Merchant</label>
+        <input id="tx-merchant" name="merchant" maxlength="120" placeholder="Indomaret">
+      </div>
+
+      <div class="field">
+        <label for="tx-note">Catatan</label>
+        <input id="tx-note" name="note" maxlength="500" placeholder="Opsional">
+      </div>
+
+      <input type="hidden" name="period" value="{{ period }}">
+    </div>
+
+    <div class="dialog-foot">
+      <button class="btn btn-ghost" type="button" onclick="closeTxDialog()">Batal</button>
+      <button class="btn btn-primary" type="submit">Simpan</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}

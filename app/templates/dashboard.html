@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Dashboard</h1>
+    <p class="muted">Ringkasan {{ data.label }}</p>
+  </div>
+  <div class="period-nav">
+    <a class="btn btn-icon" href="/?period={{ prev_period }}" aria-label="Bulan sebelumnya">&lsaquo;</a>
+    <span class="pill">{{ period_label(period) }}</span>
+    <a class="btn btn-icon" href="/?period={{ next_period }}" aria-label="Bulan berikutnya">&rsaquo;</a>
+  </div>
+</div>
+
+<section class="stats">
+  <div class="card stat">
+    <span class="stat-label"><i class="dot" style="background: var(--expense)"></i> Pengeluaran</span>
+    <strong class="stat-value num">{{ format_idr(data.expense) }}</strong>
+    <span class="stat-note">{{ data.count }} transaksi</span>
+  </div>
+  <div class="card stat">
+    <span class="stat-label"><i class="dot" style="background: var(--income)"></i> Pemasukan</span>
+    <strong class="stat-value num">{{ format_idr(data.income) }}</strong>
+    <span class="stat-note">Bulan ini</span>
+  </div>
+  <div class="card stat">
+    <span class="stat-label">Selisih</span>
+    <strong class="stat-value num {% if data.net < 0 %}neg{% endif %}">{{ format_idr(data.net) }}</strong>
+    <span class="stat-note">Pemasukan &minus; pengeluaran</span>
+  </div>
+  <div class="card stat">
+    <span class="stat-label">Total saldo</span>
+    <strong class="stat-value num">{{ format_idr(total_balance) }}</strong>
+    <span class="stat-note">{{ balances | length }} dompet aktif</span>
+  </div>
+</section>
+
+<section class="grid-2">
+  <div class="card">
+    <div class="card-head">
+      <div>
+        <h2 class="card-title">Arus kas 6 bulan</h2>
+        <p class="card-sub">Perbandingan pemasukan dan pengeluaran</p>
+      </div>
+      <div class="legend">
+        <span><i class="dot" style="background: var(--income)"></i> Masuk</span>
+        <span><i class="dot" style="background: var(--expense)"></i> Keluar</span>
+      </div>
+    </div>
+
+    {% set peak = cashflow | sum(attribute='expense') + cashflow | sum(attribute='income') %}
+    {% if cashflow_has_data %}
+      <div class="chart">
+        {% for month in cashflow %}
+          <div class="chart-col" title="{{ month.label }} · masuk {{ format_idr(month.income) }} · keluar {{ format_idr(month.expense) }}">
+            <div class="chart-bars">
+              <div class="chart-bar income" style="height: {{ month.income_pct }}%"></div>
+              <div class="chart-bar expense" style="height: {{ month.expense_pct }}%"></div>
+            </div>
+            <span class="chart-label">{{ month.label.split(' ')[0] }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty">
+        <strong>Belum ada data</strong>
+        Kirim foto struk ke bot atau tambah transaksi manual.
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div>
+        <h2 class="card-title">Pengeluaran per kategori</h2>
+        <p class="card-sub">{{ data.label }}</p>
+      </div>
+    </div>
+
+    {% if categories %}
+      <div class="donut-wrap">
+        <svg class="donut" viewBox="0 0 100 100" role="img" aria-label="Komposisi pengeluaran">
+          <circle cx="50" cy="50" r="40" fill="none" stroke="#1b212c" stroke-width="13"/>
+          {% for segment in donut %}
+            <circle cx="50" cy="50" r="40" fill="none"
+                    stroke="{{ segment.color }}" stroke-width="13"
+                    stroke-dasharray="{{ segment.dash }}" stroke-dashoffset="{{ segment.offset }}"
+                    transform="rotate(-90 50 50)"/>
+          {% endfor %}
+        </svg>
+        <div class="donut-legend">
+          {% for item in categories %}
+            <div class="legend-item">
+              <i class="dot" style="background: {{ item.color }}"></i>
+              <span class="legend-name">{{ item.name }}</span>
+              <span class="legend-value num">{{ format_idr(item.total) }}</span>
+              <span class="legend-pct num">{{ item.pct }}%</span>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    {% else %}
+      <div class="empty">
+        <strong>Belum ada pengeluaran</strong>
+        Kategori akan muncul setelah ada transaksi.
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+<section class="grid-2">
+  <div class="card">
+    <div class="card-head">
+      <div>
+        <h2 class="card-title">Budget</h2>
+        <p class="card-sub">Pemakaian per kategori</p>
+      </div>
+      <a class="btn btn-ghost btn-sm" href="/budgets?period={{ period }}">Atur</a>
+    </div>
+
+    {% if budgets %}
+      <div class="stack">
+        {% for item in budgets %}
+          <div class="budget-row">
+            <div class="budget-head">
+              <span class="legend-name">{{ item.name }}</span>
+              <span class="num muted">{{ format_idr(item.spent) }} / {{ format_idr(item.amount) }}</span>
+            </div>
+            <div class="bar {% if item.over %}over{% endif %}">
+              <span style="width: {{ item.pct if item.pct < 100 else 100 }}%"></span>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty">
+        <strong>Belum ada budget</strong>
+        Tentukan batas pengeluaran per kategori.
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div>
+        <h2 class="card-title">Transaksi terakhir</h2>
+        <p class="card-sub">{{ data.label }}</p>
+      </div>
+      <a class="btn btn-ghost btn-sm" href="/transactions?period={{ period }}">Semua</a>
+    </div>
+
+    {% if recent %}
+      <div class="list">
+        {% for item in recent %}
+          <div class="list-row">
+            <div class="list-main">
+              <span class="list-title">{{ item.merchant or item.note or (item.category.name if item.category else 'Transaksi') }}</span>
+              <span class="list-sub">{{ item.category.name if item.category else 'Tanpa kategori' }} · {{ format_dt(item.occurred_at) }}</span>
+            </div>
+            <div class="list-right">
+              <span class="num {% if item.kind == 'expense' %}amount-expense{% elif item.kind == 'income' %}amount-income{% endif %}">
+                {% if item.kind == 'expense' %}-{% elif item.kind == 'income' %}+{% endif %}{{ format_idr(item.amount) }}
+              </span>
+              {% if item.status == 'pending' %}<span class="badge badge-pending">Menunggu</span>{% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty">
+        <strong>Belum ada transaksi</strong>
+        Kirim foto struk ke bot Telegram.
+      </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Pengaturan · {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Pengaturan</h1>
+    <p class="muted">Akun, integrasi, dan data</p>
+  </div>
+</div>
+
+<section class="grid-2">
+  <div class="stack">
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2 class="card-title">Akun</h2>
+          <p class="card-sub">{{ user.email }}</p>
+        </div>
+      </div>
+
+      <form method="post" action="/settings/password" class="form-grid">
+        <div class="field">
+          <label for="current-password">Password sekarang</label>
+          <input id="current-password" name="current_password" type="password" autocomplete="current-password" required>
+        </div>
+        <div class="field">
+          <label for="new-password">Password baru</label>
+          <input id="new-password" name="new_password" type="password" minlength="12" autocomplete="new-password" required>
+          <span class="hint">Minimal 12 karakter. Semua sesi lain akan keluar.</span>
+        </div>
+        <button class="btn btn-primary" type="submit">Ganti password</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2 class="card-title">Integrasi</h2>
+          <p class="card-sub">Status layanan yang terhubung</p>
+        </div>
+      </div>
+
+      <div class="info-list">
+        <div class="info-row">
+          <span>Bot Telegram</span>
+          <span class="badge {% if telegram_active %}badge-ok{% else %}badge-off{% endif %}">
+            {{ 'Aktif' if telegram_active else 'Belum diatur' }}
+          </span>
+        </div>
+        <div class="info-row">
+          <span>LLM lokal (kategori)</span>
+          <span class="badge {% if llm_active %}badge-ok{% else %}badge-off{% endif %}">
+            {{ llm_model if llm_active else 'Nonaktif' }}
+          </span>
+        </div>
+        <div class="info-row">
+          <span>Zona waktu</span>
+          <span class="muted">{{ timezone }}</span>
+        </div>
+        <div class="info-row">
+          <span>Merchant tersimpan</span>
+          <span class="muted num">{{ merchant_count }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stack">
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2 class="card-title">Sumber kategori</h2>
+          <p class="card-sub">{{ transaction_count }} transaksi tersimpan</p>
+        </div>
+      </div>
+
+      {% set labels = {
+        'merchant': 'Ingatan merchant',
+        'fuzzy': 'Mirip merchant',
+        'rule': 'Aturan keyword',
+        'llm': 'LLM lokal',
+        'none': 'Tidak terdeteksi',
+        'manual': 'Diisi manual'
+      } %}
+
+      {% if sources %}
+        <div class="stack">
+          {% for item in sources %}
+            <div class="budget-row">
+              <div class="budget-head">
+                <span class="legend-name">{{ labels.get(item.name, item.name) }}</span>
+                <span class="num muted">{{ item.count }} &middot; {{ item.pct }}%</span>
+              </div>
+              <div class="bar">
+                <span style="width: {{ item.pct }}%"></span>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+        <p class="hint">
+          Semakin besar porsi "Ingatan merchant", semakin jarang LLM dipanggil.
+        </p>
+      {% else %}
+        <div class="empty">
+          <strong>Belum ada data</strong>
+          Statistik muncul setelah ada transaksi.
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2 class="card-title">Export</h2>
+          <p class="card-sub">Unduh transaksi bulan berjalan</p>
+        </div>
+      </div>
+      <a class="btn btn-block" href="/export.xlsx">Download Excel bulan ini</a>
+      <p class="hint">
+        Untuk bulan lain, buka halaman Transaksi, pilih bulan, lalu tekan Export Excel.
+      </p>
+    </div>
+  </div>
+</section>
+{% endblock %}

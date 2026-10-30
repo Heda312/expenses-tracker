@@ -1,0 +1,457 @@
+"""Bot Telegram.
+
+Alur: kirim foto struk atau tulis transaksi -> bot menampilkan draft ->
+pengguna menekan Simpan / Ubah / Batal. Tidak ada yang masuk laporan
+sebelum dikonfirmasi.
+"""
+
+import asyncio
+import html
+import logging
+
+from aiogram import Bot, Dispatcher, F, Router
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ChatAction, ParseMode
+from aiogram.filters import Command, CommandStart
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from sqlalchemy import select
+
+from app.config import settings
+from app.db import SessionLocal
+from app.models import Account, Category, Transaction, utcnow
+from app.services import ingest
+from app.services.dates import format_dt
+from app.services.merchant import remember_merchant
+from app.services.money import format_idr, parse_amount
+
+logger = logging.getLogger(__name__)
+router = Router()
+
+# Media group queue: {chat_id: {group_id: [(message_id, bytes), ...]}}
+_media_group_queue: dict[int, dict[str, list[tuple[int, bytes]]]] = {}
+_media_group_timeout: dict[str, asyncio.Task] = {}
+
+
+async def _flush_media_group(chat_id: int, group_id: str) -> None:
+    """Proses semua foto dari media group menjadi transaksi."""
+    queue = _media_group_queue.get(chat_id, {})
+    items = queue.pop(group_id, [])
+    if not items:
+        return
+
+    async def _process_one(msg_id: int, img: bytes):
+        status_msg = None
+        try:
+            with SessionLocal() as db:
+                transaction, _data = await ingest.draft_from_photo(
+                    db,
+                    img,
+                    chat_id=chat_id,
+                    message_id=msg_id,
+                    update_id=msg_id,
+                )
+                if transaction:
+                    text, keyboard = _render(db, transaction)
+                    status_msg = await bot.send_message(
+                        chat_id,
+                        text,
+                        reply_markup=keyboard,
+                        reply_to_message_id=msg_id,
+                    )
+        except Exception as exc:
+            logger.warning("Media group processing error: %s", exc)
+            if status_msg:
+                await bot.edit_message_text(
+                    "Gagal memproses foto. Coba lagi.",
+                    chat_id,
+                    status_msg.message_id,
+                )
+
+    tasks = [_process_one(mid, img) for mid, img in items]
+    await asyncio.gather(*tasks)
+
+
+HELP_TEXT = (
+    "Kirim foto struk, atau tulis transaksi langsung.\n\n"
+    "Contoh:\n"
+    "  makan siang 35rb\n"
+    "  parkir 5rb pake gopay\n"
+    "  gaji 8jt masuk bca\n\n"
+    "Setiap hasil akan ditampilkan dulu untuk dikonfirmasi."
+)
+
+
+class EditAmount(StatesGroup):
+    waiting = State()
+
+
+def _allowed(chat_id: int | None) -> bool:
+    """Hanya satu chat yang boleh memakai bot ini."""
+    return settings.telegram_allowed_chat_id is not None and chat_id == settings.telegram_allowed_chat_id
+
+
+def _keyboard(transaction_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="Simpan", callback_data=f"tx:ok:{transaction_id}"),
+                InlineKeyboardButton(text="Ubah nominal", callback_data=f"tx:amt:{transaction_id}"),
+            ],
+            [
+                InlineKeyboardButton(text="Ubah kategori", callback_data=f"tx:cat:{transaction_id}"),
+                InlineKeyboardButton(text="Batal", callback_data=f"tx:no:{transaction_id}"),
+            ],
+        ]
+    )
+
+
+def _category_keyboard(transaction_id: int, categories: list[Category]) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    current: list[InlineKeyboardButton] = []
+
+    for category in categories:
+        current.append(
+            InlineKeyboardButton(
+                text=category.name,
+                callback_data=f"tx:setcat:{transaction_id}:{category.id}",
+            )
+        )
+        if len(current) == 2:
+            rows.append(current)
+            current = []
+
+    if current:
+        rows.append(current)
+
+    rows.append([InlineKeyboardButton(text="Kembali", callback_data=f"tx:back:{transaction_id}")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def _render(db, transaction: Transaction) -> tuple[str, InlineKeyboardMarkup]:
+    category = db.get(Category, transaction.category_id) if transaction.category_id else None
+    account = db.get(Account, transaction.account_id) if transaction.account_id else None
+
+    lines = ["<b>Perlu konfirmasi</b>"]
+    if transaction.merchant:
+        lines.append(f"Merchant: {html.escape(transaction.merchant)}")
+    lines.append(f"Nominal: <b>{format_idr(transaction.amount)}</b>")
+    lines.append(f"Kategori: {html.escape(category.name) if category else '-'}")
+    lines.append(f"Dompet: {html.escape(account.name) if account else '-'}")
+    lines.append(f"Waktu: {format_dt(transaction.occurred_at)}")
+
+    if transaction.confidence is not None:
+        lines.append(f"Keyakinan: {round(transaction.confidence * 100)}%")
+
+    if transaction.amount <= 0:
+        lines.append("")
+        lines.append("Nominal belum terbaca. Tekan Ubah nominal.")
+
+    return "\n".join(lines), _keyboard(transaction.id)
+
+
+@router.message(CommandStart())
+async def handle_start(message: Message) -> None:
+    if not _allowed(message.chat.id):
+        return
+    await message.answer(HELP_TEXT)
+
+
+@router.message(Command("help"))
+async def handle_help(message: Message) -> None:
+    if not _allowed(message.chat.id):
+        return
+    await message.answer(HELP_TEXT)
+
+
+@router.message(EditAmount.waiting)
+async def handle_new_amount(message: Message, state: FSMContext) -> None:
+    if not _allowed(message.chat.id):
+        return
+
+    amount = parse_amount(message.text)
+    if not amount or amount <= 0:
+        await message.reply("Nominal tidak dikenali. Contoh: 47500 atau 47.500")
+        return
+
+    data = await state.get_data()
+    await state.clear()
+
+    with SessionLocal() as db:
+        transaction = db.get(Transaction, data.get("tx_id"))
+        if transaction is None or transaction.deleted_at is not None:
+            await message.reply("Transaksi sudah tidak ada.")
+            return
+
+        transaction.amount = amount
+        db.commit()
+
+        text, keyboard = _render(db, transaction)
+
+    await message.reply(text, reply_markup=keyboard)
+
+
+async def _process_image(message: Message, bot: Bot, image_bytes: bytes) -> None:
+    await bot.send_chat_action(message.chat.id, ChatAction.TYPING)
+    status = await message.reply("Membaca struk...")
+
+    try:
+        with SessionLocal() as db:
+            transaction, data = await ingest.draft_from_photo(
+                db,
+                image_bytes,
+                chat_id=message.chat.id,
+                message_id=message.message_id,
+                update_id=message.message_id,
+            )
+
+            if transaction is None:
+                logger.warning(
+                    "Gagal buat draft dari foto: lines=%s confidence=%s merchant=%s amount=%s",
+                    len(data.raw_text.splitlines()) if data.raw_text else 0,
+                    data.confidence,
+                    data.merchant,
+                    data.amount,
+                )
+                await status.edit_text(
+                    "Struk belum bisa dibaca. Coba foto lebih terang dan tegak, "
+                    "atau kirim sebagai file JPG/PNG. Bisa juga tulis manual: makan 35rb"
+                )
+                return
+
+            text, keyboard = _render(db, transaction)
+        await status.edit_text(text, reply_markup=keyboard)
+    except Exception as exc:
+        logger.exception("Error proses foto")
+        await status.edit_text(f"Gagal memproses gambar: {exc}")
+
+
+@router.message(F.photo)
+async def handle_photo(message: Message, bot: Bot) -> None:
+    if not _allowed(message.chat.id):
+        return
+
+    photo = message.photo[-1]
+    try:
+        file = await bot.get_file(photo.file_id)
+        stream = await bot.download_file(file.file_path)
+        image_bytes = stream.read()
+    except Exception as exc:
+        logger.warning("Gagal mengunduh foto: %s", exc)
+        await message.reply("Foto gagal diunduh. Coba kirim ulang.")
+        return
+
+    await _process_image(message, bot, image_bytes)
+
+
+@router.message(F.document)
+async def handle_document(message: Message, bot: Bot) -> None:
+    if not _allowed(message.chat.id):
+        return
+    if not message.document:
+        return
+
+    mime = message.document.mime_type or ""
+    name = (message.document.file_name or "").lower()
+    if not (mime.startswith("image/") or name.endswith((".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff"))):
+        await message.reply("Kirim file gambar ya (JPG/PNG/JPEG).")
+        return
+
+    try:
+        file = await bot.get_file(message.document.file_id)
+        stream = await bot.download_file(file.file_path)
+        image_bytes = stream.read()
+    except Exception as exc:
+        logger.warning("Gagal mengunduh dokumen gambar: %s", exc)
+        await message.reply("Gambar gagal diunduh. Coba kirim ulang.")
+        return
+
+    await _process_image(message, bot, image_bytes)
+
+
+@router.message(F.text & ~F.text.startswith("/"))
+async def handle_text(message: Message) -> None:
+    if not _allowed(message.chat.id):
+        return
+
+    with SessionLocal() as db:
+        transaction = await ingest.draft_from_text(
+            db,
+            message.text,
+            chat_id=message.chat.id,
+            message_id=message.message_id,
+            update_id=message.message_id,
+        )
+
+        if transaction is None:
+            await message.reply(
+                "Nominal tidak ditemukan. Tulis seperti: makan siang 35rb"
+            )
+            return
+
+        text, keyboard = _render(db, transaction)
+
+    await message.reply(text, reply_markup=keyboard)
+
+
+@router.callback_query(F.data.startswith("tx:ok:"))
+async def callback_confirm(callback: CallbackQuery) -> None:
+    if callback.message is None or not _allowed(callback.message.chat.id):
+        await callback.answer("Tidak diizinkan", show_alert=True)
+        return
+
+    transaction_id = int(callback.data.split(":")[2])
+
+    with SessionLocal() as db:
+        transaction = db.get(Transaction, transaction_id)
+        if transaction is None or transaction.deleted_at is not None:
+            await callback.answer("Transaksi sudah tidak ada", show_alert=True)
+            return
+        if transaction.amount <= 0:
+            await callback.answer("Nominal belum diisi", show_alert=True)
+            return
+
+        transaction.status = "confirmed"
+        if transaction.merchant and transaction.category_id:
+            remember_merchant(db, transaction.merchant, transaction.category_id)
+        db.commit()
+
+        text, _keyboard_unused = _render(db, transaction)
+
+    await callback.message.edit_text(
+        text.replace("<b>Perlu konfirmasi</b>", "<b>Tersimpan</b>"),
+        reply_markup=None,
+    )
+    await callback.answer("Tersimpan")
+
+
+@router.callback_query(F.data.startswith("tx:no:"))
+async def callback_cancel(callback: CallbackQuery) -> None:
+    if callback.message is None or not _allowed(callback.message.chat.id):
+        await callback.answer("Tidak diizinkan", show_alert=True)
+        return
+
+    transaction_id = int(callback.data.split(":")[2])
+
+    with SessionLocal() as db:
+        transaction = db.get(Transaction, transaction_id)
+        if transaction is None:
+            await callback.answer("Transaksi sudah tidak ada", show_alert=True)
+            return
+
+        transaction.status = "rejected"
+        transaction.deleted_at = utcnow()
+        db.commit()
+
+    await callback.message.edit_text("Dibatalkan.", reply_markup=None)
+    await callback.answer("Dibatalkan")
+
+
+@router.callback_query(F.data.startswith("tx:amt:"))
+async def callback_amount(callback: CallbackQuery, state: FSMContext) -> None:
+    if callback.message is None or not _allowed(callback.message.chat.id):
+        await callback.answer("Tidak diizinkan", show_alert=True)
+        return
+
+    transaction_id = int(callback.data.split(":")[2])
+    await state.set_state(EditAmount.waiting)
+    await state.update_data(tx_id=transaction_id)
+
+    await callback.message.reply("Ketik nominal yang benar. Contoh: 47500")
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("tx:cat:"))
+async def callback_categories(callback: CallbackQuery) -> None:
+    if callback.message is None or not _allowed(callback.message.chat.id):
+        await callback.answer("Tidak diizinkan", show_alert=True)
+        return
+
+    transaction_id = int(callback.data.split(":")[2])
+
+    with SessionLocal() as db:
+        categories = list(
+            db.scalars(
+                select(Category)
+                .where(Category.kind == "expense")
+                .order_by(Category.sort_order)
+            ).all()
+        )
+
+    await callback.message.edit_reply_markup(
+        reply_markup=_category_keyboard(transaction_id, categories)
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("tx:setcat:"))
+async def callback_set_category(callback: CallbackQuery) -> None:
+    if callback.message is None or not _allowed(callback.message.chat.id):
+        await callback.answer("Tidak diizinkan", show_alert=True)
+        return
+
+    _prefix, _action, raw_transaction_id, raw_category_id = callback.data.split(":")
+    transaction_id = int(raw_transaction_id)
+    category_id = int(raw_category_id)
+
+    with SessionLocal() as db:
+        transaction = db.get(Transaction, transaction_id)
+        if transaction is None or transaction.deleted_at is not None:
+            await callback.answer("Transaksi sudah tidak ada", show_alert=True)
+            return
+
+        transaction.category_id = category_id
+        transaction.category_source = "manual"
+        if transaction.merchant:
+            remember_merchant(db, transaction.merchant, category_id)
+        db.commit()
+
+        text, keyboard = _render(db, transaction)
+
+    await callback.message.edit_text(text, reply_markup=keyboard)
+    await callback.answer("Kategori diubah")
+
+
+@router.callback_query(F.data.startswith("tx:back:"))
+async def callback_back(callback: CallbackQuery) -> None:
+    if callback.message is None or not _allowed(callback.message.chat.id):
+        await callback.answer("Tidak diizinkan", show_alert=True)
+        return
+
+    transaction_id = int(callback.data.split(":")[2])
+
+    with SessionLocal() as db:
+        transaction = db.get(Transaction, transaction_id)
+        if transaction is None:
+            await callback.answer("Transaksi sudah tidak ada", show_alert=True)
+            return
+        text, keyboard = _render(db, transaction)
+
+    await callback.message.edit_text(text, reply_markup=keyboard)
+    await callback.answer()
+
+
+async def start_bot() -> None:
+    """Dipanggil dari lifespan FastAPI."""
+    bot = Bot(
+        token=settings.telegram_bot_token,
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+    )
+    dispatcher = Dispatcher(storage=MemoryStorage())
+    dispatcher.include_router(router)
+
+    if settings.telegram_allowed_chat_id is None:
+        logger.warning("TELEGRAM_ALLOWED_CHAT_ID belum diisi, bot akan mengabaikan semua pesan.")
+
+    try:
+        me = await bot.get_me()
+        logger.info("Bot @%s aktif.", me.username)
+        await dispatcher.start_polling(bot, handle_signals=False)
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        logger.error("Bot Telegram berhenti: %s", exc)
+    finally:
+        await bot.session.close()
