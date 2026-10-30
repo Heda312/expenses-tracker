@@ -29,7 +29,7 @@ async def ocr_endpoint(
     try:
         lines = await asyncio.to_thread(ocr.read_lines, content)
     except ocr.OcrError as exc:
-        return JSONResponse({"error": f"OCR failed: {str(exc)}"}, status_code=400)
+        return JSONResponse({"error": str(exc)}, status_code=400)
     except Exception as exc:
         return JSONResponse({"error": f"Unexpected error: {str(exc)}"}, status_code=400)
 
