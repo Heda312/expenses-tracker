@@ -11,7 +11,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
 from fastapi.responses import RedirectResponse
 from pydantic import ValidationError
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -334,6 +334,15 @@ def create_transaction(
     db.add(transaction)
     db.commit()
     db.refresh(transaction)
+
+    # Transfer antar dompet: saldo netral (sumber -X, tujuan +X)
+    if data.kind == "transfer":
+        source = db.get(Account, data.account_id)
+        dest = db.get(Account, data.to_account_id)
+        if source and dest:
+            source.balance -= data.amount
+            dest.balance += data.amount
+
     _audit(db, transaction, "create", None)
 
     return _back(period, "saved")
@@ -386,6 +395,15 @@ def update_transaction(
         transaction.category_id = None
     transaction.category_source = "manual"
 
+    # Update saldo saat transfer diubah
+    if transaction.kind == "transfer" and data.account_id != transaction.account_id:
+        old_source = db.get(Account, transaction.account_id)
+        new_source = db.get(Account, data.account_id)
+        if old_source and new_source:
+            # Revert old source, apply new source
+            old_source.balance += data.amount
+            new_source.balance -= data.amount
+
     db.commit()
     _audit(db, transaction, "update", before)
 
@@ -431,8 +449,51 @@ def delete_transaction(
         return _back(period, "notfound")
 
     before = _snapshot(transaction)
+
+    # Restore balance untuk transfer
+    if transaction.kind == "transfer":
+        source = db.get(Account, transaction.account_id)
+        dest = db.get(Account, transaction.to_account_id)
+        if source and dest:
+            source.balance += transaction.amount
+            dest.balance -= transaction.amount
+
     transaction.deleted_at = utcnow()
     db.commit()
     _audit(db, transaction, "delete", before)
+
+    return _back(period, "deleted")
+
+
+@router.post("/transactions/bulk-delete")
+def bulk_delete_transactions(
+    request: Request,
+    tx_ids: list[int] = Form([]),
+    period: str = Form(""),
+    db: Session = Depends(get_db),
+    _user=Depends(require_user),
+):
+    check_origin(request)
+
+    if not tx_ids:
+        return _back(period, "no-select")
+
+    # Restore balance untuk transfer sebelum delete
+    for tx_id in tx_ids:
+        tx = db.get(Transaction, tx_id)
+        if tx and tx.kind == "transfer":
+            source = db.get(Account, tx.account_id)
+            dest = db.get(Account, tx.to_account_id)
+            if source and dest:
+                source.balance += tx.amount
+                dest.balance -= tx.amount
+
+    # Bulk soft delete
+    db.execute(
+        update(Transaction)
+        .where(Transaction.id.in_(tx_ids))
+        .values(deleted_at=utcnow())
+    )
+    db.commit()
 
     return _back(period, "deleted")
