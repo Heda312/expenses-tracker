@@ -146,11 +146,12 @@
       document.getElementById("preview-category").selectedIndex = 0;
       document.getElementById("preview-account").selectedIndex = 0;
 
-      // Show loading overlay
+      // Show modal first with image and loading overlay
       var loading = document.getElementById("upload-loading");
       if (loading) {
         loading.style.display = "flex";
       }
+      uploadPreviewDialog.showModal();
 
       var formData = new FormData();
       formData.append("file", file);
@@ -176,11 +177,10 @@
           if (data.account_id) {
             document.getElementById("preview-account").value = data.account_id;
           }
-          // Hide loading before showing modal
+          // Hide loading after OCR complete
           if (loading) {
             loading.style.display = "none";
           }
-          uploadPreviewDialog.showModal();
         })
         .catch(function (err) {
           if (loading) {
