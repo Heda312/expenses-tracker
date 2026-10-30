@@ -31,9 +31,6 @@ async def lifespan(_app: FastAPI):
     with SessionLocal() as db:
         ensure_seed(db)
 
-    # Yield dulu agar server bisa start, bot polling dijalankan secara async setelahnya
-    yield
-
     bot_task = None
     if settings.telegram_bot_token:
         from app.bot import start_bot
@@ -46,6 +43,9 @@ async def lifespan(_app: FastAPI):
 
         bot_task = asyncio.create_task(_start_bot_wrapper())
         logger.info("Bot Telegram dijalankan (polling).")
+
+    # Yield dulu agar server bisa start
+    yield
 
     if bot_task:
         bot_task.cancel()
