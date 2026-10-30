@@ -1,11 +1,10 @@
-"""Pembungkus OCR (RapidOCR / PaddleOCR versi ONNX).
+"""OCR engine wrapper using EasyOCR.
 
-Engine dimuat malas (lazy) supaya aplikasi tetap bisa start walau
-rapidocr belum terpasang. Kalau OCR gagal, pengguna masih bisa
-mengisi transaksi manual.
+EasyOCR lebih akurat daripada rapidocr-onnxruntime,
+cocok buat baca struk Indonesia.
 """
-
 import logging
+import io
 
 logger = logging.getLogger(__name__)
 
@@ -13,28 +12,28 @@ _engine = None
 
 
 class OcrError(RuntimeError):
-    """Dilempar kalau gambar tidak bisa dibaca atau engine tidak tersedia."""
+    """Raised when image cannot be read or engine unavailable."""
 
 
 def _get_engine():
     global _engine
     if _engine is None:
         try:
-            from rapidocr_onnxruntime import RapidOCR
+            import easyocr
         except ImportError as exc:  # pragma: no cover
             raise OcrError(
-                "rapidocr-onnxruntime belum terpasang. Jalankan: pip install -r requirements.txt"
+                "easyocr belum terpasang. Jalankan: pip install easyocr"
             ) from exc
-        logger.info("Memuat model OCR...")
-        _engine = RapidOCR()
-        logger.info("Model OCR siap.")
+        logger.info("Memuat model EasyOCR...")
+        _engine = easyocr.Reader(["id", "en"], gpu=False)
+        logger.info("Model EasyOCR siap.")
     return _engine
 
 
-def _run_ocr(image):
+def _run_ocr(image_bytes: bytes):
     engine = _get_engine()
     try:
-        result, _elapsed = engine(image)
+        result = engine.readtext(image_bytes, detail=1, paragraph=False)
     except Exception as exc:
         raise OcrError(f"OCR gagal: {exc}") from exc
 
@@ -43,8 +42,8 @@ def _run_ocr(image):
         if not text or not str(text).strip():
             continue
         try:
-            ys = [point[1] for point in box]
             xs = [point[0] for point in box]
+            ys = [point[1] for point in box]
             lines.append(
                 {
                     "text": str(text).strip(),
@@ -61,7 +60,7 @@ def _run_ocr(image):
     return lines
 
 
-def _preprocess_gray(image_bytes: bytes):
+def _preprocess(image_bytes: bytes):
     import cv2
     import numpy as np
 
@@ -74,7 +73,9 @@ def _preprocess_gray(image_bytes: bytes):
     max_side = max(h, w)
     if max_side < 1800:
         scale = 1800 / max_side
-        image = cv2.resize(image, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_CUBIC)
+        image = cv2.resize(
+            image, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_CUBIC
+        )
 
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     gray = cv2.bilateralFilter(gray, 7, 75, 75)
@@ -83,39 +84,20 @@ def _preprocess_gray(image_bytes: bytes):
     return gray
 
 
-def _upscale_color(image_bytes: bytes):
-    import cv2
-    import numpy as np
-
-    array = np.frombuffer(image_bytes, dtype=np.uint8)
-    image = cv2.imdecode(array, cv2.IMREAD_COLOR)
-    if image is None:
-        raise OcrError("Gambar tidak bisa dibaca.")
-
-    h, w = image.shape[:2]
-    max_side = max(h, w)
-    if max_side < 2200:
-        scale = 2200 / max_side
-        image = cv2.resize(image, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_CUBIC)
-    return image
-
-
 def read_lines(image_bytes: bytes) -> list[dict]:
     """Baca gambar, kembalikan daftar baris teks beserta posisinya."""
-    lines = []
     try:
-        img = _preprocess_gray(image_bytes)
+        img = _preprocess(image_bytes)
         lines = _run_ocr(img)
         if len(lines) >= 5:
             return lines
     except Exception:
-        lines = []
+        pass
 
     try:
-        img = _upscale_color(image_bytes)
-        lines2 = _run_ocr(img)
-        if len(lines2) > len(lines):
-            lines = lines2
+        lines = _run_ocr(image_bytes)
+        if len(lines) >= 5:
+            return lines
     except Exception:
         pass
 

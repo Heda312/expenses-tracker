@@ -73,7 +73,7 @@
     if (!uploadPreviewDialog) {
       return;
     }
-    document.getElementById("file-input").click();
+    getFileInput().click();
   };
 
   window.closeUploadPreview = function () {
@@ -82,14 +82,21 @@
     }
   };
 
-  // Hidden file input for OCR
-  var fileInput = document.createElement("input");
-  fileInput.type = "file";
-  fileInput.id = "file-input";
-  fileInput.accept = "image/*";
-  fileInput.style.display = "none";
-  fileInput.addEventListener("change", handleFileSelect);
-  document.body.appendChild(fileInput);
+  // Hidden file input for OCR (created on first click to ensure DOM ready)
+  var fileInput = null;
+
+  function getFileInput() {
+    if (!fileInput) {
+      fileInput = document.createElement("input");
+      fileInput.type = "file";
+      fileInput.id = "file-input";
+      fileInput.accept = "image/*";
+      fileInput.style.display = "none";
+      fileInput.addEventListener("change", handleFileSelect);
+      document.body.appendChild(fileInput);
+    }
+    return fileInput;
+  }
 
   function handleFileSelect(event) {
     var file = event.target.files[0];
