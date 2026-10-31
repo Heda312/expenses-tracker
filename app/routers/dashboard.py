@@ -24,7 +24,7 @@ def dashboard(
     period = valid_period(period)
     start, end = month_bounds(period)
 
-    data = ledger.summary(db, period)
+    data = ledger.analytics(db, period)
     balances = ledger.account_balances(db)
     expense_categories = ledger.category_totals(db, period, kind="expense", limit=6)
     cashflow = ledger.cashflow(db, months=6, end_period=period)
