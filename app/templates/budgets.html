@@ -43,7 +43,7 @@
                 {% endif %}
                 &middot; {{ item.pct }}%
               </span>
-              <form method="post" action="/budgets/{{ item.id }}/delete" onsubmit="return confirm('Hapus budget ini?')">
+              <form method="post" action="/budgets/{{ item.id }}/delete" onsubmit="return requestConfirm(this, 'Hapus budget ini?')">
                 <input type="hidden" name="period" value="{{ period }}">
                 <button class="btn btn-sm btn-ghost btn-danger" type="submit">Hapus</button>
               </form>
