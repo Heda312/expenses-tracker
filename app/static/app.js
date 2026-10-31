@@ -4,9 +4,6 @@
   "use strict";
 
   var dialog = document.getElementById("tx-dialog");
-  if (!dialog) {
-    return;
-  }
 
   var pickerDialog = document.getElementById("picker-dialog");
 
@@ -100,11 +97,33 @@
 
   window.showAlert = function (message) {
     if (!alertDialog || !alertContent) {
-      alert(message);
       return;
     }
     alertContent.textContent = message;
     alertDialog.showModal();
+  };
+
+  var confirmDialog = document.getElementById("confirm-dialog");
+  var confirmContent = document.getElementById("confirm-content");
+  var confirmResolve = null;
+
+  window.closeConfirm = function (answer) {
+    if (confirmDialog) confirmDialog.close();
+    if (confirmResolve) {
+      var resolve = confirmResolve;
+      confirmResolve = null;
+      resolve(answer);
+    }
+  };
+
+  window.requestConfirm = function (form, message) {
+    if (!confirmDialog || !confirmContent) return false;
+    confirmContent.textContent = message;
+    confirmDialog.showModal();
+    confirmResolve = function (answer) {
+      if (answer) form.submit();
+    };
+    return false;
   };
 
   window.closeAlertDialog = function () {
@@ -171,15 +190,17 @@
           return res.json();
         })
         .then(function (data) {
-          document.getElementById("preview-amount").value = data.amount || "";
+           document.getElementById("preview-amount").value = data.amount ? String(data.amount) : "";
           document.getElementById("preview-merchant").value = data.merchant || "";
-          document.getElementById("preview-date").value = data.occurred_at || "";
+           document.getElementById("preview-date").value = data.occurred_at ? data.occurred_at.slice(0, 16) : "";
+           var previewKind = document.getElementById("preview-kind");
+           if (previewKind) previewKind.value = data.kind || "expense";
           document.getElementById("preview-text").textContent = data.text || "";
           if (data.category_id) {
             document.getElementById("preview-category").value = data.category_id;
           }
           if (data.account_id) {
-            document.getElementById("preview-account").value = data.account_id;
+             document.getElementById("preview-account").value = String(data.account_id);
           }
           // Hide loading after OCR complete
           if (loading) {
@@ -219,7 +240,7 @@
       form.elements["occurred_at"].value = validated.occurred_at;
       form.elements["category_id"].value = validated.category_id;
       form.elements["account_id"].value = validated.account_id;
-      form.elements["kind"].value = validated.kind || "expense";
+       form.elements["kind"].value = validated.kind || "expense";
       if (validated.to_account_id) {
         form.elements["to_account_id"].value = validated.to_account_id;
       } else {
@@ -240,6 +261,7 @@
     var occurred_at = document.getElementById("preview-date").value;
     var category_id = document.getElementById("preview-category").value;
     var account_id = document.getElementById("preview-account").value;
+    var kindControl = document.getElementById("preview-kind");
 
     if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
       errors.push("Nominal harus > 0");
@@ -267,7 +289,7 @@
       occurred_at: occurred_at,
       category_id: parseInt(category_id, 10),
       account_id: parseInt(account_id, 10),
-      kind: "expense", // OCR preview default to expense
+      kind: kindControl ? kindControl.value : "expense",
       to_account_id: null, // OCR preview tidak support transfer langsung
     };
   }
@@ -303,7 +325,9 @@
 
   window.confirmBulkDelete = function () {
     var checked = checkedCount();
-    return checked > 0 && confirm("Hapus " + checked + " transaksi terpilih?");
+    var bulkForm = document.getElementById("bulk-form");
+    if (checked === 0 || !bulkForm) return false;
+    return window.requestConfirm(bulkForm, "Hapus " + checked + " transaksi terpilih?");
   };
 
   if (checkAll) {
