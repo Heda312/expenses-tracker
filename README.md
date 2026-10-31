@@ -211,4 +211,4 @@ docker compose exec app python -m app.cli create-user --username nama --password
 
 ## License
 
-MIT
+This project is licensed under the [MIT License](LICENSE).
