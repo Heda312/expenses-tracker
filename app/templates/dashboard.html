@@ -39,6 +39,21 @@
 
 <section class="grid-2">
   <div class="card">
+    <div class="card-head"><div><h2 class="card-title">Insight periode</h2><p class="card-sub">Analisis otomatis</p></div></div>
+    <div class="stack">
+      <div class="list-row"><span class="list-title">Rata-rata pengeluaran harian</span><strong class="num">{{ format_idr(data.daily_average) }}</strong></div>
+      <div class="list-row"><span class="list-title">Perubahan pengeluaran</span><strong class="num {% if data.expense_change_pct > 0 %}amount-expense{% else %}amount-income{% endif %}">{{ data.expense_change_pct }}%</strong></div>
+      {% if data.top_category %}<div class="list-row"><span class="list-title">Kategori terbesar</span><strong>{{ data.top_category.name }}</strong></div>{% endif %}
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-head"><div><h2 class="card-title">Merchant terbesar</h2><p class="card-sub">Berdasarkan total pengeluaran</p></div></div>
+    {% if data.top_merchants %}<div class="list">{% for item in data.top_merchants %}<div class="list-row"><span class="list-title">{{ item.name }}</span><strong class="num">{{ format_idr(item.total) }}</strong></div>{% endfor %}</div>{% else %}<div class="empty">Belum ada data merchant.</div>{% endif %}
+  </div>
+</section>
+
+<section class="grid-2">
+  <div class="card">
     <div class="card-head">
       <div>
         <h2 class="card-title">Arus kas 6 bulan</h2>

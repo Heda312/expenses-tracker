@@ -10,7 +10,18 @@
   <div class="row-actions">
     <button class="btn btn-primary" type="button" onclick="openPicker()">Tambah</button>
     {% if period != 'all' %}
-      <a class="btn" href="/export.xlsx?period={{ period }}">Export Excel</a>
+      <details class="export-menu">
+        <summary class="btn">Export</summary>
+        <div class="export-menu-panel">
+          <strong>Export {{ period }}</strong>
+          <a href="/export.xlsx?period={{ period }}">Excel laporan</a>
+          <a href="/export/umum.csv?period={{ period }}">CSV umum</a>
+          <a href="/export/bca.csv?period={{ period }}">Format bank BCA</a>
+          <a href="/export/mandiri.csv?period={{ period }}">Format bank Mandiri</a>
+          <a href="/export/bri.csv?period={{ period }}">Format bank BRI</a>
+          <a href="/export/ewallet.csv?period={{ period }}">Format e-wallet</a>
+        </div>
+      </details>
     {% endif %}
   </div>
 
