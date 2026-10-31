@@ -54,6 +54,22 @@
 
 <section class="grid-2">
   <div class="card">
+    <div class="card-head"><div><h2 class="card-title">Metrik kebiasaan</h2><p class="card-sub">Pola transaksi {{ data.label }}</p></div></div>
+    <div class="stack">
+      <div class="list-row"><span class="list-title">Hari aktif</span><strong>{{ data.active_days }} hari</strong></div>
+      <div class="list-row"><span class="list-title">Rata-rata per transaksi</span><strong class="num">{{ format_idr(data.average_transaction) }}</strong></div>
+      <div class="list-row"><span class="list-title">Rasio tabungan</span><strong class="num {% if data.savings_rate < 0 %}amount-expense{% else %}amount-income{% endif %}">{{ data.savings_rate }}%</strong></div>
+      {% if data.highest_transaction %}<div class="list-row"><span class="list-title">Transaksi terbesar</span><strong class="num">{{ format_idr(data.highest_transaction.amount) }}</strong></div>{% endif %}
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-head"><div><h2 class="card-title">Penggunaan dompet</h2><p class="card-sub">Pengeluaran per dompet</p></div></div>
+    {% if data.top_accounts %}<div class="list">{% for item in data.top_accounts %}<div class="list-row"><span class="list-title">{{ item.name }}</span><strong class="num">{{ format_idr(item.total) }}</strong></div>{% endfor %}</div>{% else %}<div class="empty">Belum ada data dompet.</div>{% endif %}
+  </div>
+</section>
+
+<section class="grid-2">
+  <div class="card">
     <div class="card-head">
       <div>
         <h2 class="card-title">Arus kas 6 bulan</h2>
