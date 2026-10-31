@@ -82,6 +82,17 @@
     {% block content %}{% endblock %}
   </main>
 </div>
+<dialog id="confirm-dialog" class="app-dialog">
+  <div class="dialog-head">
+    <h2 id="confirm-title">Konfirmasi</h2>
+    <button class="btn btn-icon btn-ghost" type="button" onclick="closeConfirm(false)" aria-label="Tutup">&times;</button>
+  </div>
+  <div class="dialog-body"><p id="confirm-content" class="muted"></p></div>
+  <div class="dialog-foot">
+    <button class="btn btn-ghost" type="button" onclick="closeConfirm(false)">Batal</button>
+    <button class="btn btn-danger" type="button" onclick="closeConfirm(true)">Lanjutkan</button>
+  </div>
+</dialog>
 <script src="/static/app.js"></script>
 </body>
 </html>
