@@ -3,7 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="dark">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#21133f">
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="apple-touch-icon" href="/static/favicon.svg">
   <title>{% block title %}{{ app_name }}{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,7 +20,7 @@
 <div class="shell">
   <aside class="sidebar">
     <div class="brand">
-      <span class="brand-mark"></span>
+      <span class="brand-mark" aria-hidden="true">H</span>
       <div class="brand-name">
         <span>{{ app_name }}</span>
         <span class="brand-sub">Pengeluaran Pribadi</span>
@@ -72,7 +75,13 @@
     </form>
   </aside>
 
-  <main class="main">
+   <main class="main">
+     <div class="page-decoration page-decoration-one" aria-hidden="true"></div>
+     <div class="page-decoration page-decoration-two" aria-hidden="true"></div>
+     <header class="mobile-brand" aria-label="Catat">
+       <span class="brand-mark" aria-hidden="true">H</span>
+       <strong>{{ app_name }}</strong>
+     </header>
     {% set flash_key = request.query_params.get('flash') %}
     {% if flash_key and flash_key in flash_messages %}
       {% set flash_kind, flash_text = flash_messages[flash_key] %}
