@@ -8,6 +8,8 @@ sebelum dikonfirmasi.
 import asyncio
 import html
 import logging
+import re
+from datetime import datetime, timedelta
 
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.client.default import DefaultBotProperties
@@ -26,9 +28,12 @@ from app.services import ingest
 from app.services.dates import format_dt
 from app.services.merchant import remember_merchant
 from app.services.money import format_idr, parse_amount
+from app.services import ledger
+from app.services.dates import current_period, now_local, to_utc, shift_period, month_bounds
 
 logger = logging.getLogger(__name__)
 router = Router()
+bot_instance: Bot | None = None
 
 # Media group queue: {chat_id: {group_id: [(message_id, bytes), ...]}}
 _media_group_queue: dict[int, dict[str, list[tuple[int, bytes]]]] = {}
@@ -80,7 +85,18 @@ HELP_TEXT = (
     "  makan siang 35rb\n"
     "  parkir 5rb pake gopay\n"
     "  gaji 8jt masuk bca\n\n"
-    "Setiap hasil akan ditampilkan dulu untuk dikonfirmasi."
+    "Setiap hasil akan ditampilkan dulu untuk dikonfirmasi.\n\n"
+    "Perintah laporan:\n"
+    "/ringkasan - kondisi keuangan bulan ini\n"
+    "/saldo - saldo semua dompet\n"
+    "/budget - status budget\n"
+    "/pengeluaran - total pengeluaran bulan ini\n"
+    "/pemasukan - total pemasukan bulan ini\n"
+    "/transaksi - transaksi terakhir\n"
+    "/harian - spending dan pemasukan hari ini\n"
+    "/mingguan - spending dan pemasukan minggu ini\n"
+    "/bulanan - spending dan pemasukan bulan ini\n"
+    "Kirim foto struk langsung ke chat untuk diproses otomatis."
 )
 
 
@@ -166,6 +182,152 @@ async def handle_help(message: Message) -> None:
     await message.answer(HELP_TEXT)
 
 
+def _financial_summary() -> str:
+    with SessionLocal() as db:
+        period = current_period()
+        data = ledger.analytics(db, period)
+        balances = ledger.account_balances(db)
+        budgets = ledger.budget_progress(db, period)
+    lines = [
+        f"<b>Ringkasan {data['label']}</b>",
+        f"Pemasukan: <b>{format_idr(data['income'])}</b>",
+        f"Pengeluaran: <b>{format_idr(data['expense'])}</b>",
+        f"Cashflow: <b>{format_idr(data['net'])}</b>",
+        f"Saldo: <b>{format_idr(sum(item['balance'] for item in balances))}</b>",
+        f"Rata-rata harian: {format_idr(data['daily_average'])}",
+    ]
+    if data["top_category"]:
+        lines.append(f"Kategori terbesar: {data['top_category']['name']}")
+    if budgets:
+        over = [item["name"] for item in budgets if item["over"]]
+        if over:
+            lines.append("Budget terlewati: " + ", ".join(over))
+    return "\n".join(lines)
+
+
+def _question_period(text: str) -> tuple[datetime, datetime, str] | None:
+    """Parse hari/minggu/bulan dari pertanyaan natural-language."""
+    now = now_local()
+    today = now.date()
+    lowered = text.lower().replace("mingguini", "minggu ini").replace("bulanini", "bulan ini")
+    if "hari ini" in lowered or "hari" in lowered:
+        start = datetime.combine(today, datetime.min.time(), tzinfo=now.tzinfo)
+        return to_utc(start), to_utc(now + timedelta(seconds=1)), "Hari ini"
+    if "kemarin" in lowered:
+        day = today - timedelta(days=1)
+        start = datetime.combine(day, datetime.min.time(), tzinfo=now.tzinfo)
+        return to_utc(start), to_utc(start + timedelta(days=1)), "Kemarin"
+    if "minggu lalu" in lowered:
+        start_day = today - timedelta(days=today.weekday() + 7)
+        start = datetime.combine(start_day, datetime.min.time(), tzinfo=now.tzinfo)
+        return to_utc(start), to_utc(start + timedelta(days=7)), "Minggu lalu"
+    if "minggu" in lowered:
+        start_day = today - timedelta(days=today.weekday())
+        start = datetime.combine(start_day, datetime.min.time(), tzinfo=now.tzinfo)
+        return to_utc(start), to_utc(now + timedelta(seconds=1)), "Minggu ini"
+
+    month_names = {"januari": 1, "jan": 1, "februari": 2, "feb": 2, "maret": 3, "mar": 3, "april": 4, "apr": 4, "mei": 5, "juni": 6, "jun": 6, "juli": 7, "jul": 7, "agustus": 8, "agu": 8, "september": 9, "sep": 9, "oktober": 10, "okt": 10, "november": 11, "nov": 11, "desember": 12, "des": 12}
+    match = re.search(r"\b(" + "|".join(month_names) + r")\s*(20\d{2})?\b", lowered)
+    if match:
+        month = month_names[match.group(1)]
+        year = int(match.group(2) or now.year)
+        period = f"{year:04d}-{month:02d}"
+    elif "bulan lalu" in lowered:
+        period = shift_period(current_period(), -1)
+    elif "bulan" in lowered:
+        period = current_period()
+    else:
+        return None
+    start, end = month_bounds(period)
+    return start, end, f"Bulan {period[5:7]}/{period[:4]}"
+
+
+def _answer_finance_question(text: str) -> str | None:
+    parsed = _question_period(text)
+    if not parsed:
+        return None
+    start, end, label = parsed
+    with SessionLocal() as db:
+        data = ledger.range_summary(db, start, end)
+    lower = text.lower()
+    wants_income = any(x in lower for x in ("pemasukan", "pendapatan", "uang masuk"))
+    wants_expense = any(x in lower for x in ("pengeluaran", "spending", "belanja", "uang keluar"))
+    if wants_income and not wants_expense:
+        return f"<b>Pemasukan {label}</b>\nTotal: <b>{format_idr(data['income'])}</b>\nJumlah transaksi: {data['income_count']}"
+    if wants_expense and not wants_income:
+        return f"<b>Pengeluaran {label}</b>\nTotal: <b>{format_idr(data['expense'])}</b>\nJumlah transaksi: {data['expense_count']}"
+    return (f"<b>Kondisi keuangan {label}</b>\nPemasukan: <b>{format_idr(data['income'])}</b> ({data['income_count']} transaksi)\n"
+            f"Pengeluaran: <b>{format_idr(data['expense'])}</b> ({data['expense_count']} transaksi)\n"
+            f"Cashflow: <b>{format_idr(data['net'])}</b>")
+
+
+@router.message(Command("ringkasan", "status"))
+async def handle_summary(message: Message) -> None:
+    if _allowed(message.chat.id):
+        await message.answer(_financial_summary())
+
+
+@router.message(Command("saldo"))
+async def handle_balance(message: Message) -> None:
+    if not _allowed(message.chat.id):
+        return
+    with SessionLocal() as db:
+        balances = ledger.account_balances(db)
+    await message.answer("<b>Saldo dompet</b>\n" + "\n".join(f"{x['name']}: {format_idr(x['balance'])}" for x in balances))
+
+
+@router.message(Command("budget"))
+async def handle_budget(message: Message) -> None:
+    if not _allowed(message.chat.id):
+        return
+    with SessionLocal() as db:
+        items = ledger.budget_progress(db, current_period())
+    if not items:
+        await message.answer("Belum ada budget bulan ini.")
+        return
+    await message.answer("<b>Budget bulan ini</b>\n" + "\n".join(f"{x['name']}: {format_idr(x['spent'])} / {format_idr(x['amount'])} ({x['pct']}%)" for x in items))
+
+
+@router.message(Command("pengeluaran", "pemasukan"))
+async def handle_totals(message: Message) -> None:
+    if not _allowed(message.chat.id):
+        return
+    with SessionLocal() as db:
+        data = ledger.summary(db, current_period())
+    key = "expense" if message.text.lower().startswith("/pengeluaran") else "income"
+    label = "Pengeluaran" if key == "expense" else "Pemasukan"
+    await message.answer(f"{label} bulan ini: <b>{format_idr(data[key])}</b>")
+
+
+async def _period_report(message: Message, scope: str) -> None:
+    if not _allowed(message.chat.id):
+        return
+    with SessionLocal() as db:
+        data = ledger.named_range_summary(db, scope)
+    await message.answer(
+        f"<b>Ringkasan {data['label']}</b>\n"
+        f"Pemasukan: <b>{format_idr(data['income'])}</b>\n"
+        f"Pengeluaran: <b>{format_idr(data['expense'])}</b>\n"
+        f"Cashflow: <b>{format_idr(data['net'])}</b>\n"
+        f"Transaksi: {data['count']}"
+    )
+
+
+@router.message(Command("harian"))
+async def handle_daily(message: Message) -> None:
+    await _period_report(message, "day")
+
+
+@router.message(Command("mingguan"))
+async def handle_weekly(message: Message) -> None:
+    await _period_report(message, "week")
+
+
+@router.message(Command("bulanan"))
+async def handle_monthly(message: Message) -> None:
+    await _period_report(message, "month")
+
+
 @router.message(EditAmount.waiting)
 async def handle_new_amount(message: Message, state: FSMContext) -> None:
     if not _allowed(message.chat.id):
@@ -228,11 +390,18 @@ async def _process_image(message: Message, bot: Bot, image_bytes: bytes) -> None
         await status.edit_text(f"Gagal memproses gambar: {exc}")
 
 
-# DISABLED: Image upload via Telegram (user prefers website upload only)
-# @router.message(F.photo)
-# async def handle_photo(message: Message, bot: Bot) -> None:
-#     if not _allowed(message.chat.id):
-#         return
+@router.message(F.photo)
+async def handle_photo(message: Message, bot: Bot) -> None:
+    if not _allowed(message.chat.id):
+        return
+    photo = message.photo[-1]
+    try:
+        file = await bot.get_file(photo.file_id)
+        stream = await bot.download_file(file.file_path)
+        await _process_image(message, bot, stream.read())
+    except Exception:
+        logger.exception("Gagal mengunduh foto Telegram")
+        await message.reply("Foto gagal diunduh. Coba kirim ulang.")
 
 #     photo = message.photo[-1]
 #     try:
@@ -247,12 +416,22 @@ async def _process_image(message: Message, bot: Bot, image_bytes: bytes) -> None
 #     await _process_image(message, bot, image_bytes)
 
 
-# @router.message(F.document)
-# async def handle_document(message: Message, bot: Bot) -> None:
-#     if not _allowed(message.chat.id):
-#         return
-#     if not message.document:
-#         return
+@router.message(F.document)
+async def handle_document(message: Message, bot: Bot) -> None:
+    if not _allowed(message.chat.id) or not message.document:
+        return
+    mime = message.document.mime_type or ""
+    name = (message.document.file_name or "").lower()
+    if not (mime.startswith("image/") or name.endswith((".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff"))):
+        await message.reply("Kirim file gambar JPG, PNG, WEBP, BMP, atau TIFF.")
+        return
+    try:
+        file = await bot.get_file(message.document.file_id)
+        stream = await bot.download_file(file.file_path)
+        await _process_image(message, bot, stream.read())
+    except Exception:
+        logger.exception("Gagal mengunduh dokumen Telegram")
+        await message.reply("Gambar gagal diunduh. Coba kirim ulang.")
 
 #     mime = message.document.mime_type or ""
 #     name = (message.document.file_name or "").lower()
@@ -275,6 +454,17 @@ async def _process_image(message: Message, bot: Bot, image_bytes: bytes) -> None
 @router.message(F.text & ~F.text.startswith("/"))
 async def handle_text(message: Message) -> None:
     if not _allowed(message.chat.id):
+        return
+
+    # Pertanyaan ringkas tanpa nominal dijawab dari data terhitung,
+    # bukan ditebak LLM.
+    question = (message.text or "").lower()
+    finance_answer = _answer_finance_question(question)
+    if finance_answer:
+        await message.reply(finance_answer)
+        return
+    if any(word in question for word in ("kondisi keuangan", "ringkas", "keuangan saya", "cashflow")):
+        await message.reply(_financial_summary())
         return
 
     with SessionLocal() as db:
@@ -436,10 +626,12 @@ async def callback_back(callback: CallbackQuery) -> None:
 
 async def start_bot() -> None:
     """Dipanggil dari lifespan FastAPI."""
+    global bot_instance
     bot = Bot(
         token=settings.telegram_bot_token,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
+    bot_instance = bot
     dispatcher = Dispatcher(storage=MemoryStorage())
     dispatcher.include_router(router)
 
@@ -455,4 +647,5 @@ async def start_bot() -> None:
     except Exception as exc:
         logger.error("Bot Telegram berhenti: %s", exc)
     finally:
+        bot_instance = None
         await bot.session.close()
