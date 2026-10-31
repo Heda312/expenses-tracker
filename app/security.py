@@ -123,6 +123,9 @@ def require_user(request: Request, db: Session = Depends(get_db)) -> User:
 
 def check_origin(request: Request) -> None:
     """Cegah CSRF sederhana: origin/referer harus sama dengan host kita."""
+    # Skip check untuk localhost development
+    if request.url.hostname in ("localhost", "127.0.0.1"):
+        return
     origin = request.headers.get("origin") or request.headers.get("referer")
     if not origin:
         return

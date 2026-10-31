@@ -57,13 +57,12 @@
     form.elements["kind"].value = data.kind;
     form.elements["amount"].value = data.amount;
     form.elements["account_id"].value = String(data.account_id);
-    if (data.kind === "transfer" && data.to_account_id) {
-      form.elements["to_account_id"].value = String(data.to_account_id);
-    }
-    form.elements["category_id"].value = String(data.category_id);
+    form.elements["to_account_id"].value =
+      data.kind === "transfer" && data.to_account_id != null ? String(data.to_account_id) : "";
     form.elements["merchant"].value = data.merchant;
     form.elements["note"].value = data.note;
     form.elements["occurred_at"].value = data.occurred_at;
+    form.elements["category_id"].value = data.category_id == null ? "" : String(data.category_id);
 
     applyKind(data.kind);
     dialog.showModal();
@@ -162,7 +161,12 @@
       })
         .then(function (res) {
           if (!res.ok) {
-            throw new Error("OCR failed");
+            // Try to parse JSON error response
+            return res.json().then(function (errData) {
+              throw new Error(errData.error || "OCR failed");
+            }).catch(function () {
+              throw new Error("OCR failed (HTTP " + res.status + ")");
+            });
           }
           return res.json();
         })
@@ -215,7 +219,12 @@
       form.elements["occurred_at"].value = validated.occurred_at;
       form.elements["category_id"].value = validated.category_id;
       form.elements["account_id"].value = validated.account_id;
-      form.elements["kind"].value = "expense";
+      form.elements["kind"].value = validated.kind || "expense";
+      if (validated.to_account_id) {
+        form.elements["to_account_id"].value = validated.to_account_id;
+      } else {
+        form.elements["to_account_id"].value = "";
+      }
 
       closeUploadPreview();
       dialog.showModal();
@@ -258,6 +267,57 @@
       occurred_at: occurred_at,
       category_id: parseInt(category_id, 10),
       account_id: parseInt(account_id, 10),
+      kind: "expense", // OCR preview default to expense
+      to_account_id: null, // OCR preview tidak support transfer langsung
     };
   }
+
+  // Bulk delete: checkbox terhubung ke form #bulk-form lewat atribut form="bulk-form",
+  // jadi submit-nya POST biasa (bukan fetch) dan redirect server tetap dipakai.
+  var bulkDeleteBtn = document.getElementById("bulk-delete");
+  var checkAll = document.getElementById("check-all");
+  var bulkCount = document.getElementById("bulk-count");
+  var selectBoxes = Array.prototype.slice.call(document.querySelectorAll(".tx-select"));
+
+  function checkedCount() {
+    return selectBoxes.filter(function (cb) {
+      return cb.checked;
+    }).length;
+  }
+
+  function updateBulkDelete() {
+    var checked = checkedCount();
+
+    if (bulkDeleteBtn) {
+      bulkDeleteBtn.disabled = checked === 0;
+      bulkDeleteBtn.textContent = checked > 0 ? "Hapus " + checked + " Terpilih" : "Hapus Terpilih";
+    }
+    if (bulkCount) {
+      bulkCount.textContent = checked + " dipilih";
+    }
+    if (checkAll) {
+      checkAll.checked = checked > 0 && checked === selectBoxes.length;
+      checkAll.indeterminate = checked > 0 && checked < selectBoxes.length;
+    }
+  }
+
+  window.confirmBulkDelete = function () {
+    var checked = checkedCount();
+    return checked > 0 && confirm("Hapus " + checked + " transaksi terpilih?");
+  };
+
+  if (checkAll) {
+    checkAll.addEventListener("change", function () {
+      selectBoxes.forEach(function (cb) {
+        cb.checked = checkAll.checked;
+      });
+      updateBulkDelete();
+    });
+  }
+
+  selectBoxes.forEach(function (cb) {
+    cb.addEventListener("change", updateBulkDelete);
+  });
+
+  updateBulkDelete();
 })();

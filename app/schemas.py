@@ -50,8 +50,10 @@ class TransactionInput(BaseModel):
     @field_validator("to_account_id", "category_id", mode="before")
     @classmethod
     def _empty_int_to_none(cls, value):
-        if value is None or (isinstance(value, str) and not value.strip()):
+        if value is None or (isinstance(value, str) and value.strip() == ""):
             return None
+        if isinstance(value, str):
+            return int(value)
         return value
 
 

@@ -35,6 +35,7 @@ def dashboard(
             Transaction.deleted_at.is_(None),
             Transaction.occurred_at >= start,
             Transaction.occurred_at < end,
+            Transaction.kind != "transfer",
         )
         .order_by(Transaction.occurred_at.desc())
         .limit(8)

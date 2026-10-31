@@ -134,10 +134,19 @@
 
 <div class="card table-card">
   {% if rows %}
+    <form id="bulk-form" method="post" action="/transactions/bulk-delete"
+          onsubmit="return window.confirmBulkDelete ? confirmBulkDelete() : true">
+      <input type="hidden" name="period" value="{{ period }}">
+      <div class="bulk-bar">
+        <span class="muted" id="bulk-count">0 dipilih</span>
+        <button class="btn btn-sm btn-danger" type="submit" id="bulk-delete" disabled>Hapus Terpilih</button>
+      </div>
+    </form>
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
+            <th class="col-check"><input type="checkbox" id="check-all" aria-label="Pilih semua"></th>
             <th>Tanggal</th>
             <th>Keterangan</th>
             <th>Dompet</th>
@@ -149,6 +158,10 @@
           {% for row in rows %}
             {% set item = row.tx %}
             <tr class="{% if item.status == 'pending' %}row-pending{% endif %}">
+              <td class="col-check">
+                <input type="checkbox" class="tx-select" form="bulk-form" name="tx_ids"
+                       value="{{ item.id }}" aria-label="Pilih transaksi {{ item.id }}">
+              </td>
               <td class="nowrap">
                 <div>{{ format_dt(item.occurred_at) }}</div>
                 {% if item.status == 'pending' %}<span class="badge badge-pending">Menunggu</span>{% endif %}
@@ -163,8 +176,8 @@
                 </div>
               </td>
               <td>{{ item.account.name if item.account else '-' }}</td>
-              <td class="right num {% if item.kind == 'expense' %}amount-expense{% elif item.kind == 'income' %}amount-income{% endif %}">
-                {% if item.kind == 'expense' %}-{% elif item.kind == 'income' %}+{% endif %}{{ format_idr(item.amount) }}
+              <td class="right num {% if item.kind == 'expense' %}amount-expense{% elif item.kind == 'income' %}amount-income{% elif item.kind == 'transfer' %}amount-transfer{% endif %}">
+                {% if item.kind == 'expense' %}-{% elif item.kind == 'income' %}+{% elif item.kind == 'transfer' %}=={% endif %}{{ format_idr(item.amount) }}
               </td>
               <td>
                 <div class="row-actions end">

@@ -4,6 +4,7 @@ Semua perubahan dicatat di audit_logs supaya angka yang berubah
 bisa ditelusuri kapan dan dari mana.
 """
 
+import asyncio
 import json
 import uuid
 from pathlib import Path
@@ -11,7 +12,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
 from fastapi.responses import RedirectResponse
 from pydantic import ValidationError
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -19,68 +20,12 @@ from app.db import get_db
 from app.models import Account, AuditLog, Category, Transaction, utcnow
 from app.schemas import TransactionInput
 from app.security import check_origin, require_user
-from app.services import ingest, ocr, receipt
+from app.services import classify, ocr, receipt
 from app.services.dates import current_period, month_bounds, to_local, to_local_datetime, valid_period
 from app.templating import templates
 
 router = APIRouter()
 PER_PAGE = 25
-
-
-def _save_image(image_bytes: bytes) -> str:
-    name = f"{uuid.uuid4().hex}.jpg"
-    path = Path(settings.upload_dir) / name
-    path.write_bytes(image_bytes)
-    return f"uploads/{name}"
-
-
-@router.post("/upload")
-async def upload_image(
-    request: Request,
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    _user=Depends(require_user),
-):
-    if file.content_type not in ("image/jpeg", "image/png", "image/webp"):
-        return RedirectResponse("/transactions?flash=invalid", status_code=303)
-
-    image_bytes = await file.read()
-    try:
-        lines = await asyncio.to_thread(ocr.read_lines, image_bytes)
-    except ocr.OcrError as exc:
-        logger.warning("OCR gagal: %s", exc)
-        return RedirectResponse("/transactions?flash=invalid", status_code=303)
-
-    data = receipt.parse_receipt(lines)
-    account = _pick_account(db, data.raw_text)
-    if account is None:
-        return RedirectResponse("/transactions?flash=invalid", status_code=303)
-
-    image_path = _save_image(image_bytes)
-    occurred_at = to_local_datetime(data.date) if data.date else utcnow()
-    category_id, category_source = await ingest.classify_category(db, data.merchant, data.raw_text)
-
-    transaction = Transaction(
-        kind="expense",
-        amount=data.amount or 0,
-        account_id=account.id,
-        category_id=category_id,
-        merchant=(data.merchant or None),
-        note=None,
-        occurred_at=occurred_at,
-        source="web",
-        status="pending",
-        confidence=data.confidence,
-        raw_text=data.raw_text[:4000],
-        image_path=image_path,
-        category_source=category_source,
-    )
-    db.add(transaction)
-    db.commit()
-    db.refresh(transaction)
-
-    flash = "ok" if data.amount else "invalid"
-    return RedirectResponse(f"/transactions?flash={flash}", status_code=303)
 
 
 def _save_image(image_bytes: bytes, suffix: str = ".jpg") -> str:
@@ -117,7 +62,6 @@ def _audit(db: Session, transaction: Transaction, action: str, before: str | Non
             after_json=_snapshot(transaction),
         )
     )
-    db.commit()
 
 
 def _back(period: str, flash: str) -> RedirectResponse:
@@ -332,18 +276,9 @@ def create_transaction(
         category_source="manual",
     )
     db.add(transaction)
-    db.commit()
-    db.refresh(transaction)
-
-    # Transfer antar dompet: saldo netral (sumber -X, tujuan +X)
-    if data.kind == "transfer":
-        source = db.get(Account, data.account_id)
-        dest = db.get(Account, data.to_account_id)
-        if source and dest:
-            source.balance -= data.amount
-            dest.balance += data.amount
-
+    db.flush()
     _audit(db, transaction, "create", None)
+    db.commit()
 
     return _back(period, "saved")
 
@@ -395,17 +330,12 @@ def update_transaction(
         transaction.category_id = None
     transaction.category_source = "manual"
 
-    # Update saldo saat transfer diubah
-    if transaction.kind == "transfer" and data.account_id != transaction.account_id:
-        old_source = db.get(Account, transaction.account_id)
-        new_source = db.get(Account, data.account_id)
-        if old_source and new_source:
-            # Revert old source, apply new source
-            old_source.balance += data.amount
-            new_source.balance -= data.amount
+    # Saldo dompet tidak disimpan di tabel accounts: selalu dihitung ulang
+    # dari transaksi di app/services/ledger.py, jadi tidak perlu disesuaikan
+    # manual saat transaksi dibuat/diubah/dihapus.
 
-    db.commit()
     _audit(db, transaction, "update", before)
+    db.commit()
 
     return _back(period, "updated")
 
@@ -428,8 +358,8 @@ def confirm_transaction(
 
     before = _snapshot(transaction)
     transaction.status = "confirmed"
-    db.commit()
     _audit(db, transaction, "update", before)
+    db.commit()
 
     return _back(period, "updated")
 
@@ -449,18 +379,9 @@ def delete_transaction(
         return _back(period, "notfound")
 
     before = _snapshot(transaction)
-
-    # Restore balance untuk transfer
-    if transaction.kind == "transfer":
-        source = db.get(Account, transaction.account_id)
-        dest = db.get(Account, transaction.to_account_id)
-        if source and dest:
-            source.balance += transaction.amount
-            dest.balance -= transaction.amount
-
     transaction.deleted_at = utcnow()
-    db.commit()
     _audit(db, transaction, "delete", before)
+    db.commit()
 
     return _back(period, "deleted")
 
@@ -478,22 +399,22 @@ def bulk_delete_transactions(
     if not tx_ids:
         return _back(period, "no-select")
 
-    # Restore balance untuk transfer sebelum delete
-    for tx_id in tx_ids:
-        tx = db.get(Transaction, tx_id)
-        if tx and tx.kind == "transfer":
-            source = db.get(Account, tx.account_id)
-            dest = db.get(Account, tx.to_account_id)
-            if source and dest:
-                source.balance += tx.amount
-                dest.balance -= tx.amount
+    transactions = db.scalars(
+        select(Transaction).where(
+            Transaction.id.in_(tx_ids),
+            Transaction.deleted_at.is_(None),
+        )
+    ).all()
+    if not transactions:
+        return _back(period, "notfound")
 
-    # Bulk soft delete
-    db.execute(
-        update(Transaction)
-        .where(Transaction.id.in_(tx_ids))
-        .values(deleted_at=utcnow())
-    )
+    # Hapus lunak (soft delete). Saldo dompet otomatis ikut menyesuaikan
+    # karena dihitung dari transaksi yang belum dihapus.
+    now = utcnow()
+    for transaction in transactions:
+        before = _snapshot(transaction)
+        transaction.deleted_at = now
+        _audit(db, transaction, "delete", before)
     db.commit()
 
     return _back(period, "deleted")

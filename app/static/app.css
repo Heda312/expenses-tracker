@@ -459,6 +459,27 @@ h2 {
   overflow-x: auto;
 }
 
+/* Bar aksi massal di atas tabel transaksi */
+.bulk-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px 4px;
+}
+
+.col-check {
+  width: 40px;
+  padding-right: 0;
+}
+
+.col-check input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -515,6 +536,11 @@ tbody tr.row-pending {
 
 .amount-income {
   color: var(--income);
+}
+
+.amount-transfer {
+  color: var(--text);
+  font-weight: 600;
 }
 
 .badge {
@@ -711,6 +737,15 @@ select {
 
 .row-actions form {
   margin: 0;
+}
+
+/* Make entire form area clickable for delete/confirm buttons */
+.row-actions form {
+  cursor: pointer;
+}
+
+.row-actions form button {
+  cursor: pointer;
 }
 
 /* ------------------------------------------------------------------ budget */

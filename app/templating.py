@@ -29,6 +29,7 @@ FLASH_MESSAGES = {
     "password": ("ok", "Password diganti. Silakan login ulang."),
     "invalid": ("err", "Data tidak valid. Periksa kembali isian Anda."),
     "notfound": ("err", "Data tidak ditemukan."),
+    "no-select": ("err", "Pilih minimal satu transaksi."),
     "wrong": ("err", "Email atau password salah."),
     "locked": ("err", "Terlalu banyak percobaan. Coba lagi beberapa menit lagi."),
     "invalidlink": ("err", "Tautan tidak valid."),
