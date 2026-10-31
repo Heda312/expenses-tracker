@@ -5,6 +5,7 @@ from io import BytesIO
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
+from openpyxl.chart import BarChart, Reference
 
 KIND_LABEL = {
     "expense": "Pengeluaran",
@@ -95,6 +96,16 @@ def build_workbook(rows: list[dict], summary: dict, by_category: list[dict]) -> 
         cell = recap.cell(row=offset, column=2, value=item["total"])
         cell.number_format = '#,##0'
         cell.alignment = RIGHT
+
+    chart = BarChart()
+    chart.title = "Pengeluaran per kategori"
+    chart.y_axis.title = "Rupiah"
+    chart.x_axis.title = "Kategori"
+    chart.add_data(Reference(recap, min_col=2, min_row=9, max_row=9 + len(by_category)), titles_from_data=True)
+    chart.set_categories(Reference(recap, min_col=1, min_row=10, max_row=9 + len(by_category)))
+    chart.height = 7
+    chart.width = 14
+    recap.add_chart(chart, "D3")
 
     # --- Sheet 3: budget (kalau ada) --------------------------------------
     if summary.get("budgets"):
