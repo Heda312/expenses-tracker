@@ -10,6 +10,7 @@ Pencatat pengeluaran dengan input via Telegram bot (foto struk + teks) dan web d
 - Dompet multiple (tunai, bank, e-wallet)
 - Kategori auto-detect: merchant alias → keyword → fuzzy → LLM → "Lainnya"
 - Login username/password, akun pertama dibuat saat setup, session DB-backed, lockout 5 failed/15 menit
+- Hapus akun dari Pengaturan dengan konfirmasi password; akun dan data aplikasi akan dihapus permanen
 - SQLite + WAL (baca/tulis paralel bot + web)
 - Data: uang INTEGER rupiah, waktu UTC (tampilAsia/Jakarta)
 

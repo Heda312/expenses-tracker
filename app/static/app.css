@@ -264,6 +264,11 @@ h2 {
   overflow: hidden;
 }
 
+.danger-card {
+  border-color: rgba(251, 113, 133, .45);
+  background: radial-gradient(500px circle at top, rgba(244, 63, 94, .08), transparent 65%), var(--panel);
+}
+
 .card::after {
   content: "";
   position: absolute;

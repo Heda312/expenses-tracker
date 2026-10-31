@@ -62,7 +62,7 @@
     <div class="stack">
       <div class="list-row"><span class="list-title">Hari aktif</span><strong>{{ data.active_days }} hari</strong></div>
       <div class="list-row"><span class="list-title">Rata-rata per transaksi</span><strong class="num">{{ format_idr(data.average_transaction) }}</strong></div>
-      <div class="list-row"><span class="list-title">Rasio tabungan</span><strong class="num {% if data.savings_rate < 0 %}amount-expense{% else %}amount-income{% endif %}">{{ data.savings_rate }}%</strong></div>
+      <div class="list-row"><span class="list-title">Rasio tabungan</span>{% if data.savings_rate is not none %}<strong class="num {% if data.savings_rate < 0 %}amount-expense{% else %}amount-income{% endif %}">{{ data.savings_rate }}%</strong>{% else %}<span class="muted">Belum ada pemasukan</span>{% endif %}</div>
       {% if data.highest_transaction %}<div class="list-row"><span class="list-title">Transaksi terbesar</span><strong class="num">{{ format_idr(data.highest_transaction.amount) }}</strong></div>{% endif %}
     </div>
   </div>

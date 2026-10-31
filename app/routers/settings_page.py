@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.db import get_db
-from app.models import Merchant, Transaction, UserSession
+from app.models import AuditLog, Budget, Category, Merchant, Transaction, UserSession
 from app.schemas import PasswordInput
 from app.security import (
     COOKIE_NAME,
@@ -80,5 +80,31 @@ def change_password(
     db.commit()
 
     response = RedirectResponse("/login?flash=password", status_code=303)
+    response.delete_cookie(COOKIE_NAME, path="/")
+    return response
+
+
+@router.post("/settings/delete-account")
+def delete_account(
+    request: Request,
+    password: str = Form(""),
+    db: Session = Depends(get_db),
+    user=Depends(require_user),
+):
+    """Hapus akun aktif dan seluruh data single-user secara permanen."""
+    check_origin(request)
+    if not verify_password(password, user.password_hash):
+        return RedirectResponse("/settings?flash=wrong", status_code=303)
+
+    db.query(UserSession).delete(synchronize_session=False)
+    db.query(AuditLog).delete(synchronize_session=False)
+    db.query(Transaction).delete(synchronize_session=False)
+    db.query(Budget).delete(synchronize_session=False)
+    db.query(Merchant).delete(synchronize_session=False)
+    db.query(Category).delete(synchronize_session=False)
+    db.delete(user)
+    db.commit()
+
+    response = RedirectResponse("/setup", status_code=303)
     response.delete_cookie(COOKIE_NAME, path="/")
     return response

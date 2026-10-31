@@ -64,6 +64,22 @@
         </div>
       </div>
     </div>
+
+    <div class="card danger-card">
+      <div class="card-head">
+        <div>
+          <h2 class="card-title">Hapus akun</h2>
+          <p class="card-sub">Hapus akun dan seluruh data secara permanen.</p>
+        </div>
+      </div>
+      <form method="post" action="/settings/delete-account" class="form-grid" onsubmit="return requestConfirm(this, 'Akun, transaksi, dompet, budget, dan seluruh data akan dihapus permanen. Lanjutkan?')">
+        <div class="field">
+          <label for="delete-account-password">Password untuk konfirmasi</label>
+          <input id="delete-account-password" name="password" type="password" autocomplete="current-password" required>
+        </div>
+        <button class="btn btn-danger" type="submit">Hapus akun permanen</button>
+      </form>
+    </div>
   </div>
 
   <div class="stack">
