@@ -37,22 +37,25 @@
   </div>
 </section>
 
-<section class="grid-2">
+<section class="dashboard-cards">
   <div class="card">
     <div class="card-head"><div><h2 class="card-title">Insight periode</h2><p class="card-sub">Analisis otomatis</p></div></div>
     <div class="stack">
-      <div class="list-row"><span class="list-title">Rata-rata pengeluaran harian</span><strong class="num">{{ format_idr(data.daily_average) }}</strong></div>
-      <div class="list-row"><span class="list-title">Perubahan pengeluaran</span><strong class="num {% if data.expense_change_pct > 0 %}amount-expense{% else %}amount-income{% endif %}">{{ data.expense_change_pct }}%</strong></div>
+      <div class="list-row"><span class="list-title">Rata-rata per hari kalender</span><strong class="num">{{ format_idr(data.daily_average) }}</strong></div>
+      <div class="list-row"><span class="list-title">Rata-rata per hari aktif</span><strong class="num">{{ format_idr(data.active_daily_average) }}</strong></div>
+      <div class="list-row"><span class="list-title">Hari aktif</span><strong>{{ data.active_days }} hari</strong></div>
+      <div class="list-row"><span class="list-title">Perubahan pengeluaran</span>{% if data.expense_change_pct is not none %}<strong class="num {% if data.expense_change_pct > 0 %}amount-expense{% else %}amount-income{% endif %}">{% if data.expense_change_pct > 0 %}Naik{% elif data.expense_change_pct < 0 %}Turun{% else %}Tetap{% endif %} {{ data.expense_change_pct|abs }}%</strong>{% else %}<span class="muted">Belum ada data pembanding</span>{% endif %}</div>
+      <div class="list-row"><span class="list-title">Rasio tabungan</span>{% if data.savings_rate is not none %}<strong class="num {% if data.savings_rate < 0 %}amount-expense{% else %}amount-income{% endif %}">{{ data.savings_rate }}%</strong>{% else %}<span class="muted">Belum ada pemasukan</span>{% endif %}</div>
       {% if data.top_category %}<div class="list-row"><span class="list-title">Kategori terbesar</span><strong>{{ data.top_category.name }}</strong></div>{% endif %}
     </div>
   </div>
   <div class="card">
-    <div class="card-head"><div><h2 class="card-title">Merchant terbesar</h2><p class="card-sub">Berdasarkan total pengeluaran</p></div></div>
+    <div class="card-head"><div><h2 class="card-title">Tempat paling banyak belanja</h2><p class="card-sub">Merchant dengan total pengeluaran terbesar di {{ data.label|lower }}</p></div></div>
     {% if data.top_merchants %}<div class="list">{% for item in data.top_merchants %}<div class="list-row"><span class="list-title">{{ item.name }}</span><strong class="num">{{ format_idr(item.total) }}</strong></div>{% endfor %}</div>{% else %}<div class="empty">Belum ada data merchant.</div>{% endif %}
   </div>
 </section>
 
-<section class="grid-2">
+<section class="dashboard-cards">
   <div class="card">
     <div class="card-head"><div><h2 class="card-title">Metrik kebiasaan</h2><p class="card-sub">Pola transaksi {{ data.label }}</p></div></div>
     <div class="stack">
@@ -63,12 +66,12 @@
     </div>
   </div>
   <div class="card">
-    <div class="card-head"><div><h2 class="card-title">Penggunaan dompet</h2><p class="card-sub">Pengeluaran per dompet</p></div></div>
+    <div class="card-head"><div><h2 class="card-title">Dompet yang paling sering dipakai</h2><p class="card-sub">Total uang keluar dari setiap dompet pada {{ data.label|lower }}</p></div></div>
     {% if data.top_accounts %}<div class="list">{% for item in data.top_accounts %}<div class="list-row"><span class="list-title">{{ item.name }}</span><strong class="num">{{ format_idr(item.total) }}</strong></div>{% endfor %}</div>{% else %}<div class="empty">Belum ada data dompet.</div>{% endif %}
   </div>
 </section>
 
-<section class="grid-2">
+<section class="dashboard-cards dashboard-cards-wide">
   <div class="card">
     <div class="card-head">
       <div>
@@ -105,8 +108,8 @@
   <div class="card">
     <div class="card-head">
       <div>
-        <h2 class="card-title">Pengeluaran per kategori</h2>
-        <p class="card-sub">{{ data.label }}</p>
+        <h2 class="card-title">Uang keluar berdasarkan kategori</h2>
+        <p class="card-sub">Pembagian total pengeluaran pada {{ data.label|lower }}. Persentase menunjukkan porsi dari seluruh uang keluar.</p>
       </div>
     </div>
 
