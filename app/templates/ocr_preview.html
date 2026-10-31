@@ -104,9 +104,8 @@
             <label for="category_id">Kategori</label>
             <select id="category_id" name="category_id">
               <option value="">Tanpa kategori</option>
-              {% for category in categories %}
-              <option value="{{ category.id }}" {% if item.category_id == category.id %}selected{% endif %}>{{ category.name }}</option>
-              {% endfor %}
+              <optgroup label="Pengeluaran">{% for category in categories if category.kind == 'expense' %}<option value="{{ category.id }}" {% if item.category_id == category.id %}selected{% endif %}>{{ category.name }}</option>{% endfor %}</optgroup>
+              <optgroup label="Pemasukan">{% for category in categories if category.kind == 'income' %}<option value="{{ category.id }}" {% if item.category_id == category.id %}selected{% endif %}>{{ category.name }}</option>{% endfor %}</optgroup>
             </select>
           </div>
         </div>
