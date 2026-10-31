@@ -34,6 +34,8 @@ class TransactionInput(BaseModel):
     @field_validator("occurred_at", mode="before")
     @classmethod
     def _to_utc(cls, value):
+        # Semua input website dan timestamp struk adalah waktu lokal aplikasi
+        # (Asia/Jakarta secara default). Hanya database yang memakai UTC.
         if isinstance(value, str):
             value = datetime.fromisoformat(value)
         if value.tzinfo is None:
