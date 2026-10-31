@@ -71,9 +71,7 @@
       <div class="field">
         <label for="budget-category">Kategori</label>
         <select id="budget-category" name="category_id" required>
-          {% for category in categories %}
-            <option value="{{ category.id }}">{{ category.name }}</option>
-          {% endfor %}
+          <optgroup label="Pengeluaran">{% for category in categories if category.kind == 'expense' %}<option value="{{ category.id }}">{{ category.name }}</option>{% endfor %}</optgroup>
         </select>
       </div>
       <div class="field">
