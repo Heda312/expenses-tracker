@@ -167,6 +167,48 @@ Bot hanya merespons chat dari `TELEGRAM_ALLOWED_CHAT_ID`.
 - Uang tidak muncul? Pastikan `DATABASE_URL` benar, jalankan `alembic upgrade head`
 - Dashboard blank? Cek `/login`, pastikan user sudah dibuat
 
+## Bantuan Login
+
+Jika database belum memiliki user, buka:
+
+```text
+http://localhost:8000/setup
+```
+
+Password minimal 12 karakter.
+
+Password tidak bisa ditampilkan kembali karena disimpan sebagai hash. Reset akun dengan backup terlebih dahulu:
+
+```bash
+docker compose stop app
+cp data/app.db data/app.db.backup
+docker compose start app
+```
+
+Hapus user dan session:
+
+```bash
+docker compose exec app python -c "from app.db import SessionLocal; from app.models import User,UserSession; db=SessionLocal(); db.query(UserSession).delete(synchronize_session=False); db.query(User).delete(synchronize_session=False); db.commit(); db.close(); print('Akun direset')"
+```
+
+Lalu buka kembali:
+
+```text
+http://localhost:8000/setup
+```
+
+Alternatif buat user lewat CLI:
+
+```bash
+docker compose exec app python -m app.cli create-user --username nama
+```
+
+CLI menampilkan password acak. Atau tentukan password sendiri:
+
+```bash
+docker compose exec app python -m app.cli create-user --username nama --password "PasswordMinimal12"
+```
+
 ## License
 
 MIT
