@@ -285,7 +285,7 @@ h2 {
 
 .grid-2 {
   display: grid;
-  grid-template-columns: 1.6fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
   gap: 18px;
   align-items: start;
   margin-bottom: 18px;
@@ -1089,6 +1089,52 @@ dialog::backdrop {
 
   .donut {
     margin: 0 auto;
+  }
+}
+
+/* Dashboard cards mengikuti lebar layar dan tinggi konten, bukan jarak tetap. */
+.dashboard-cards {
+  display: contents;
+}
+
+.dashboard-masonry {
+  column-count: 2;
+  column-gap: 14px;
+}
+
+.dashboard-cards-wide {
+  display: contents;
+}
+
+.dashboard-masonry > .grid-2 {
+  display: contents;
+}
+
+.dashboard-masonry > .dashboard-cards > .card,
+.dashboard-masonry > .dashboard-cards-wide > .card,
+.dashboard-masonry > .grid-2 > .card {
+  display: inline-block;
+  width: 100%;
+  min-width: 0;
+  height: fit-content;
+  margin: 0 0 14px;
+  vertical-align: top;
+  padding: 18px;
+  break-inside: avoid;
+}
+
+.dashboard-cards .card-head {
+  margin-bottom: 12px;
+}
+
+.dashboard-cards .stack,
+.dashboard-cards .list {
+  gap: 10px;
+}
+
+@media (max-width: 760px) {
+  .dashboard-masonry {
+    column-count: 1;
   }
 }
 

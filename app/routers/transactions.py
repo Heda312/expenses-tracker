@@ -4,35 +4,23 @@ Semua perubahan dicatat di audit_logs supaya angka yang berubah
 bisa ditelusuri kapan dan dari mana.
 """
 
-import asyncio
 import json
-import uuid
-from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import RedirectResponse
 from pydantic import ValidationError
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app.config import settings
 from app.db import get_db
 from app.models import Account, AuditLog, Category, Transaction, utcnow
 from app.schemas import TransactionInput
 from app.security import check_origin, require_user
-from app.services import classify, ocr, receipt
-from app.services.dates import current_period, month_bounds, to_local, to_local_datetime, valid_period
+from app.services.dates import current_period, month_bounds, to_local, valid_period
 from app.templating import templates
 
 router = APIRouter()
 PER_PAGE = 25
-
-
-def _save_image(image_bytes: bytes, suffix: str = ".jpg") -> str:
-    name = f"{uuid.uuid4().hex}{suffix}"
-    path = Path(settings.upload_dir) / name
-    path.write_bytes(image_bytes)
-    return f"uploads/{name}"
 
 
 def _snapshot(transaction: Transaction) -> str:
@@ -151,59 +139,6 @@ def list_transactions(
             "default_occurred": to_local(utcnow()).strftime("%Y-%m-%dT%H:%M"),
         },
     )
-
-
-@router.post("/transactions/upload")
-async def upload_receipt(
-    request: Request,
-    file: UploadFile = File(...),
-    period: str = Form(""),
-    db: Session = Depends(get_db),
-    _user=Depends(require_user),
-):
-    check_origin(request)
-
-    content = await file.read()
-    if not content:
-        return RedirectResponse(f"/transactions?period={period or current_period()}&flash=invalid", status_code=303)
-
-    ext = Path(file.filename or "").suffix.lower() or ".jpg"
-    image_path = _save_image(content, ext)
-
-    try:
-        lines = await asyncio.to_thread(ocr.read_lines, content)
-    except Exception as exc:
-        print("OCR ERROR:", exc)
-        return RedirectResponse(f"/transactions?period={period or current_period()}&flash=invalid", status_code=303)
-
-    data = receipt.parse_receipt(lines)
-    accounts = list(db.scalars(select(Account).where(Account.archived.is_(False))).all())
-    if not accounts:
-        return RedirectResponse(f"/transactions?period={period or current_period()}&flash=invalid", status_code=303)
-
-    occurred_at = to_local_datetime(data.date) if data.date else utcnow()
-    category_id, category_source = await classify.classify_category(db, data.merchant, data.raw_text, use_llm=False)
-
-    transaction = Transaction(
-        kind="expense",
-        amount=data.amount or 0,
-        account_id=accounts[0].id,
-        category_id=category_id,
-        merchant=(data.merchant or None),
-        note=None,
-        occurred_at=occurred_at,
-        source="web",
-        status="pending",
-        confidence=data.confidence,
-        raw_text=data.raw_text[:4000],
-        image_path=image_path,
-        category_source=category_source,
-    )
-    db.add(transaction)
-    db.commit()
-    db.refresh(transaction)
-
-    return RedirectResponse(f"/transactions/preview/{transaction.id}?period={period or current_period()}", status_code=303)
 
 
 @router.get("/transactions/preview/{transaction_id}")

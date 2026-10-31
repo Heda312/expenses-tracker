@@ -416,19 +416,6 @@ async def handle_photo(message: Message, bot: Bot) -> None:
         logger.exception("Gagal mengunduh foto Telegram")
         await message.reply("Foto gagal diunduh. Coba kirim ulang.")
 
-#     photo = message.photo[-1]
-#     try:
-#         file = await bot.get_file(photo.file_id)
-#         stream = await bot.download_file(file.file_path)
-#         image_bytes = stream.read()
-#     except Exception as exc:
-#         logger.warning("Gagal mengunduh foto: %s", exc)
-#         await message.reply("Foto gagal diunduh. Coba kirim ulang.")
-#         return
-
-#     await _process_image(message, bot, image_bytes)
-
-
 @router.message(F.document)
 async def handle_document(message: Message, bot: Bot) -> None:
     if not _allowed(message.chat.id) or not message.document:
@@ -445,24 +432,6 @@ async def handle_document(message: Message, bot: Bot) -> None:
     except Exception:
         logger.exception("Gagal mengunduh dokumen Telegram")
         await message.reply("Gambar gagal diunduh. Coba kirim ulang.")
-
-#     mime = message.document.mime_type or ""
-#     name = (message.document.file_name or "").lower()
-#     if not (mime.startswith("image/") or name.endswith((".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff"))):
-#         await message.reply("Kirim file gambar ya (JPG/PNG/JPEG).")
-#         return
-
-#     try:
-#         file = await bot.get_file(message.document.file_id)
-#         stream = await bot.download_file(file.file_path)
-#         image_bytes = stream.read()
-#     except Exception as exc:
-#         logger.warning("Gagal mengunduh dokumen gambar: %s", exc)
-#         await message.reply("Gambar gagal diunduh. Coba kirim ulang.")
-#         return
-
-#     await _process_image(message, bot, image_bytes)
-
 
 @router.message(F.text & ~F.text.startswith("/"))
 async def handle_text(message: Message) -> None:

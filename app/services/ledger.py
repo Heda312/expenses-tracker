@@ -97,17 +97,18 @@ def analytics(db: Session, period: str) -> dict:
                Transaction.occurred_at < end, *ACTIVE)
         .group_by(Account.id).order_by(func.sum(Transaction.amount).desc()).limit(3)
     ).all()
-    savings_rate = round(current["net"] / current["income"] * 100) if current["income"] else 0
+    savings_rate = round(current["net"] / current["income"] * 100) if current["income"] else None
     return {
         **current,
         "previous_income": previous["income"],
         "previous_expense": previous["expense"],
-        "income_change_pct": round((current["income"] - previous["income"]) / previous["income"] * 100) if previous["income"] else 0,
-        "expense_change_pct": round((current["expense"] - previous["expense"]) / previous["expense"] * 100) if previous["expense"] else 0,
+        "income_change_pct": round((current["income"] - previous["income"]) / previous["income"] * 100) if previous["income"] else None,
+        "expense_change_pct": round((current["expense"] - previous["expense"]) / previous["expense"] * 100) if previous["expense"] else None,
         "daily_average": round(current["expense"] / days),
+        "active_days": int(active_days),
+        "active_daily_average": round(current["expense"] / active_days) if active_days else 0,
         "top_category": categories[0] if categories else None,
         "top_merchants": [{"name": name, "total": int(total or 0)} for name, total in merchants],
-        "active_days": int(active_days),
         "average_transaction": round(current["expense"] / current["count"]) if current["count"] else 0,
         "savings_rate": savings_rate,
         "highest_transaction": {"amount": int(highest[0]), "merchant": highest[1] or "Transaksi", "kind": highest[2]} if highest else None,
