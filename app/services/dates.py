@@ -125,10 +125,10 @@ def parse_date(raw: str | None, base: date | None = None) -> date | None:
     if "tadi" in text or "hari ini" in text:
         return base
 
-    # ISO: 2026-10-14
+    # ISO: 2026-10-14, termasuk timestamp ISO.
     import re
 
-    iso = re.search(r"\b(\d{4})-(\d{2})-(\d{2})\b", text)
+    iso = re.search(r"\b(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})\b", text)
     if iso:
         return _safe_date(int(iso.group(1)), int(iso.group(2)), int(iso.group(3)))
 
@@ -152,6 +152,47 @@ def parse_date(raw: str | None, base: date | None = None) -> date | None:
         if month:
             return _safe_date(year, month, int(named.group(1)))
 
+    return None
+
+
+def parse_time(raw: str | None) -> time | None:
+    """Normalisasi berbagai format jam OCR menjadi ``datetime.time``.
+
+    Mendukung 18:20, 18:20:15, 18.20, 182015, 1820,
+    06:20 PM, 06.20.15pm, serta label seperti ``Time 18:20``.
+    """
+    if not raw:
+        return None
+    import re
+    text = raw.lower().strip()
+    # Separator titik/koma sering terbaca dari receipt sebagai jam.
+    match = re.search(
+        r"(?<!\d)(\d{1,2})\s*[:.]\s*(\d{2})"
+        r"(?:\s*[:.]\s*(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?(?!\d)",
+        text,
+        re.I,
+    )
+    if not match:
+        # Compact time: 1820 atau 182015. Hindari angka tanggal/nominal.
+        match = re.search(r"(?<!\d)(\d{4}|\d{6})\s*(a\.?m\.?|p\.?m\.?)?(?!\d)", text, re.I)
+        if not match:
+            return None
+        digits = match.group(1)
+        hour = int(digits[:2])
+        minute = int(digits[2:4])
+        second = int(digits[4:6]) if len(digits) == 6 else 0
+        suffix = match.group(2)
+    else:
+        hour, minute = int(match.group(1)), int(match.group(2))
+        second = int(match.group(3) or 0)
+        suffix = match.group(4)
+    suffix = suffix.replace(".", "") if suffix else None
+    if suffix == "pm" and hour < 12:
+        hour += 12
+    elif suffix == "am" and hour == 12:
+        hour = 0
+    if 0 <= hour <= 23 and 0 <= minute <= 59:
+        return time(hour, minute)
     return None
 
 
