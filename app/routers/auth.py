@@ -35,6 +35,14 @@ def login_form(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse(request, template, {"username": ""})
 
 
+@router.get("/setup")
+def setup_form(request: Request, db: Session = Depends(get_db)):
+    """Tampilkan setup hanya saat database belum memiliki user."""
+    if db.scalar(select(User.id).limit(1)) is not None:
+        return RedirectResponse("/login", status_code=303)
+    return templates.TemplateResponse(request, "setup.html", {"username": ""})
+
+
 @router.post("/setup")
 def setup_submit(request: Request, username: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
     check_origin(request)
@@ -42,7 +50,7 @@ def setup_submit(request: Request, username: str = Form(...), password: str = Fo
         return RedirectResponse("/login", status_code=303)
     username = username.strip().lower()
     if len(username) < 3 or len(username) > 80 or not username.replace("_", "").replace("-", "").isalnum() or len(password) < 12:
-        return RedirectResponse("/login?flash=setup-invalid", status_code=303)
+        return RedirectResponse("/setup?flash=setup-invalid", status_code=303)
     db.add(User(username=username, password_hash=hash_password(password)))
     db.commit()
     return RedirectResponse("/login?flash=setup-success", status_code=303)
