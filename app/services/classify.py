@@ -23,15 +23,32 @@ from app.services.merchant import find_exact, find_fuzzy
 
 # (pola, nama kategori). Urutan menentukan prioritas.
 CATEGORY_RULES: list[tuple[str, str]] = [
-    (r"pln|listrik|token|pdam|\bair\b|indihome|internet|wifi|pulsa|paket data|telkomsel|indosat|\bxl\b|\btri\b|bpjs|kos|sewa|cicilan|kartu kredit|iuran", "Tagihan"),
+    (r"zakat|sedekah|donasi|infaq|wakaf", "Donasi & Zakat"),
+    (r"dokter hewan|pet shop|petshop|kucing|anjing|hewan peliharaan|veteriner|pasir kucing", "Hewan Peliharaan"),
+    (r"bayi|popok|pampers|susu anak|mainan anak|daycare|sekolah anak", "Anak"),
+    (r"baju|pakaian|celana|sepatu|sandal|jaket|fashion|uniqlo|h\s*&\s*m|zara", "Pakaian"),
+    (r"salon|barbershop|barber|skincare|kosmetik|makeup|parfum|spa|facial", "Perawatan Diri"),
+    (r"pulsa|paket data|telkomsel|indosat|\bxl\b|\btri\b|smartfren|by\.u|internet|wifi|indihome", "Komunikasi"),
+    (r"netflix|spotify|youtube premium|disney|icloud|google one|canva pro|langganan|subscription", "Langganan"),
+    (r"pln|listrik|token|pdam|\bair\b|bpjs|kos|sewa|cicilan|kartu kredit|iuran", "Tagihan"),
+    (r"pajak|bea|materai|administrasi|biaya admin|admin bank|denda", "Pajak & Administrasi"),
+    (r"transfer|bunga pinjaman|pinjaman|asuransi|investasi|reksadana|saham|crypto", "Keuangan"),
+    (r"sabun|deterjen|detergen|sembako|gas elpiji|gas 3kg|perabot|furnitur|household|rumah tangga", "Rumah Tangga"),
     (r"parkir|bensin|pertamax|pertalite|solar|gojek|grab|ojek|taksi|taxi|transjakarta|\bkrl\b|\bmrt\b|\bbus\b|travel|\btol\b|bengkel|tiket|bandara", "Transportasi"),
     (r"apotek|apotik|klinik|rumah sakit|dokter|obat|farmasi|vitamin|lab\b|gigi|optik", "Kesehatan"),
-    (r"bioskop|cinema|\bxxi\b|cgv|steam|spotify|netflix|konser|wisata|hotel|liburan|game", "Hiburan"),
+    (r"bioskop|cinema|\bxxi\b|cgv|steam|konser|game|playstation|nintendo|karaoke|bowling", "Hiburan"),
     (r"sekolah|kuliah|buku|kursus|\bles\b|seminar|udemy|course|\bspp\b|\bukt\b", "Pendidikan"),
     (r"indomaret|alfamart|alfamidi|superindo|hypermart|transmart|carrefour|giant|minimarket|supermarket|grocer|pasar|shopee|tokopedia|lazada|blibli|belanja", "Belanja"),
     (r"resto|restoran|warung|warteg|makan|minum|kopi|coffee|cafe|kafe|bakso|sate|ayam|nasi|mie|martabak|\bkfc\b|\bmcd\b|mcdonald|burger|pizza|starbucks|chatime|\bjco\b|donat|roti|seafood|soto|geprek|food|kitchen|catering", "Makan & Minum"),
+    (r"liburan|wisata|hotel|penginapan|resort|travel|tiket pesawat|tiket kereta|tour", "Perjalanan"),
+    (r"hadiah|kado|gift|parcel|hampers|souvenir", "Hadiah"),
     (r"gaji|payroll|salary", "Gaji"),
     (r"bonus|thr|insentif", "Bonus"),
+    (r"freelance|project|proyek|jasa|honor|fee kerja", "Freelance"),
+    (r"cashback|cash back|voucher kembali", "Cashback"),
+    (r"bunga deposito|bunga tabungan|dividen", "Bunga"),
+    (r"jual|penjualan|terjual|pendapatan usaha|omzet", "Penjualan"),
+    (r"investasi|reksadana|saham|dividen investasi", "Investasi"),
 ]
 
 
