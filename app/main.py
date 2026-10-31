@@ -27,6 +27,19 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    # Pastikan schema tersedia sebelum route setup/login membaca tabel users.
+    # Docker menjalankan migration sebelum Uvicorn, tetapi guard ini membuat
+    # local/dev start tetap aman saat database baru masih kosong.
+    try:
+        from alembic import command
+        from alembic.config import Config
+
+        alembic_config = Config(str(Path(__file__).resolve().parent.parent / "alembic.ini"))
+        command.upgrade(alembic_config, "head")
+    except Exception:
+        logger.exception("Migrasi database gagal saat startup")
+        raise
+
     # Isi kategori & dompet default saat pertama kali dijalankan.
     with SessionLocal() as db:
         ensure_seed(db)
