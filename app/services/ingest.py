@@ -90,10 +90,11 @@ async def draft_from_photo(
         return None, data
 
     occurred_at = to_local_datetime(data.date) if data.date else utcnow()
-    category_id, category_source = await classify.classify_category(db, data.merchant, data.raw_text)
+    kind = "income" if INCOME_WORDS.search(data.raw_text or "") else "expense"
+    category_id, category_source = await classify.classify_category(db, data.merchant, data.raw_text, kind=kind)
 
     transaction = Transaction(
-        kind="expense",
+        kind=kind,
         amount=data.amount or 0,
         account_id=account.id,
         category_id=category_id,
@@ -139,7 +140,7 @@ async def draft_from_text(
     parsed_date = parse_date(text)
     occurred_at = to_local_datetime(parsed_date) if parsed_date else utcnow()
 
-    category_id, category_source = await classify.classify_category(db, None, text)
+    category_id, category_source = await classify.classify_category(db, None, text, kind=kind)
 
     transaction = Transaction(
         kind=kind,

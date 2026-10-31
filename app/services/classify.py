@@ -65,9 +65,10 @@ async def classify_category(
     merchant_raw: str | None,
     text: str = "",
     use_llm: bool = True,
+    kind: str = "expense",
 ) -> tuple[int | None, str]:
     """Tentukan category_id dan sumbernya."""
-    categories = {row.name: row for row in db.scalars(select(Category)).all()}
+    categories = {row.name: row for row in db.scalars(select(Category).where(Category.kind == kind)).all()}
 
     # 1. Ingatan merchant (persis)
     merchant = find_exact(db, merchant_raw)
@@ -96,5 +97,6 @@ async def classify_category(
             pass
 
     # 5. Tidak ada yang cocok
-    fallback = categories.get("Lainnya")
+    fallback_name = "Lainnya" if kind == "expense" else "Pemasukan Lain"
+    fallback = categories.get(fallback_name)
     return (fallback.id if fallback else None), "none"

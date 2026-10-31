@@ -100,8 +100,9 @@ async def ocr_endpoint(
     income = re.search(r"\b(gaji|bonus|thr|insentif|refund|pemasukan|masuk|salary|payroll)\b", raw_text, re.I)
     accounts = list(db.scalars(select(Account).where(Account.archived.is_(False)).order_by(Account.id)).all())
     account = _pick_account(accounts, raw_text)
+    kind = "income" if income else "expense"
     category_id, _category_source = await classify.classify_category(
-        db, data.merchant, raw_text, use_llm=False
+        db, data.merchant, raw_text, use_llm=False, kind=kind
     )
 
     parsed_time = parse_time(raw_text)
@@ -116,7 +117,7 @@ async def ocr_endpoint(
         occurred_at = datetime.combine(data.date, local_time).strftime("%Y-%m-%dT%H:%M")
     return JSONResponse({
         "amount": data.amount or 0,
-        "kind": "income" if income else "expense",
+        "kind": kind,
         "account_id": account.id if account else None,
         "category_id": category_id,
         "merchant": data.merchant or "",

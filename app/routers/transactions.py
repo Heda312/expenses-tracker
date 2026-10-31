@@ -4,6 +4,7 @@ Semua perubahan dicatat di audit_logs supaya angka yang berubah
 bisa ditelusuri kapan dan dari mana.
 """
 
+import asyncio
 import json
 
 from fastapi import APIRouter, Depends, Form, Query, Request
@@ -17,6 +18,7 @@ from app.models import Account, AuditLog, Category, Transaction, utcnow
 from app.schemas import TransactionInput
 from app.security import check_origin, require_user
 from app.services.dates import current_period, month_bounds, to_local, valid_period
+from app.services import classify
 from app.templating import templates
 
 router = APIRouter()
@@ -203,6 +205,8 @@ def create_transaction(
         if not data.to_account_id or data.to_account_id == data.account_id:
             return _back(period, "invalid")
         data.category_id = None
+    elif data.category_id is None:
+        data.category_id, _ = asyncio.run(classify.classify_category(db, data.merchant, f"{data.merchant or ''} {data.note or ''}", kind=data.kind, use_llm=False))
 
     transaction = Transaction(
         **data.model_dump(),
@@ -256,6 +260,8 @@ def update_transaction(
 
     if data.kind == "transfer" and (not data.to_account_id or data.to_account_id == data.account_id):
         return _back(period, "invalid")
+    if data.kind != "transfer" and data.category_id is None:
+        data.category_id, _ = asyncio.run(classify.classify_category(db, data.merchant, f"{data.merchant or ''} {data.note or ''}", kind=data.kind, use_llm=False))
 
     before = _snapshot(transaction)
 

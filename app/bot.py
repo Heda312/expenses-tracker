@@ -547,10 +547,12 @@ async def callback_categories(callback: CallbackQuery) -> None:
     transaction_id = int(callback.data.split(":")[2])
 
     with SessionLocal() as db:
+        transaction = db.get(Transaction, transaction_id)
+        transaction_kind = transaction.kind if transaction and transaction.kind in ("income", "expense") else "expense"
         categories = list(
             db.scalars(
                 select(Category)
-                .where(Category.kind == "expense")
+                .where(Category.kind == transaction_kind)
                 .order_by(Category.sort_order)
             ).all()
         )
