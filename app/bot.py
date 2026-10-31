@@ -27,7 +27,7 @@ from app.models import Account, Category, Transaction, utcnow
 from app.services import ingest
 from app.services.dates import format_dt
 from app.services.merchant import remember_merchant
-from app.services.money import format_idr, parse_amount
+from app.services.money import extract_amount, format_idr, parse_amount
 from app.services import ledger
 from app.services.dates import current_period, now_local, to_utc, shift_period, month_bounds
 
@@ -127,8 +127,16 @@ def _keyboard(transaction_id: int) -> InlineKeyboardMarkup:
 def _category_keyboard(transaction_id: int, categories: list[Category]) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     current: list[InlineKeyboardButton] = []
+    last_kind = None
 
     for category in categories:
+        if category.kind != last_kind:
+            if current:
+                rows.append(current)
+                current = []
+            label = "Pemasukan" if category.kind == "income" else "Pengeluaran"
+            rows.append([InlineKeyboardButton(text=f"— {label} —", callback_data="tx:noop")])
+            last_kind = category.kind
         current.append(
             InlineKeyboardButton(
                 text=category.name,
@@ -144,6 +152,11 @@ def _category_keyboard(transaction_id: int, categories: list[Category]) -> Inlin
 
     rows.append([InlineKeyboardButton(text="Kembali", callback_data=f"tx:back:{transaction_id}")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+@router.callback_query(F.data == "tx:noop")
+async def callback_category_header(callback: CallbackQuery) -> None:
+    await callback.answer()
 
 
 def _render(db, transaction: Transaction) -> tuple[str, InlineKeyboardMarkup]:
@@ -459,7 +472,9 @@ async def handle_text(message: Message) -> None:
     # Pertanyaan ringkas tanpa nominal dijawab dari data terhitung,
     # bukan ditebak LLM.
     question = (message.text or "").lower()
-    finance_answer = _answer_finance_question(question)
+    # Kalimat transaksi yang mengandung nominal harus masuk draft transaksi,
+    # bukan dianggap pertanyaan laporan karena punya kata "kemarin"/"bulan".
+    finance_answer = None if extract_amount(message.text or "") else _answer_finance_question(question)
     if finance_answer:
         await message.reply(finance_answer)
         return
