@@ -77,6 +77,13 @@
           <label class="hint">Waktu</label>
           <input id="preview-date" type="datetime-local" style="width:100%">
         </div>
+         <div style="margin-top:6px">
+          <label class="hint">Jenis transaksi</label>
+          <select id="preview-kind" style="width:100%">
+            <option value="expense">Pengeluaran</option>
+            <option value="income">Pemasukan</option>
+          </select>
+        </div>
         <div style="margin-top:6px">
           <label class="hint">Kategori</label>
           <select id="preview-category" style="width:100%">
@@ -191,7 +198,7 @@
                           data-tx='{{ row.form | tojson }}'
                           onclick="openTxEdit(this)">Ubah</button>
                   <form method="post" action="/transactions/{{ item.id }}/delete"
-                        onsubmit="return confirm('Hapus transaksi ini?')">
+                        onsubmit="return requestConfirm(this, 'Hapus transaksi ini?')">
                     <input type="hidden" name="period" value="{{ period }}">
                     <button class="btn btn-sm btn-ghost btn-danger" type="submit">Hapus</button>
                   </form>
