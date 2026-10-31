@@ -27,7 +27,7 @@
             <button class="btn btn-primary" type="submit">Simpan ke Laporan</button>
           </form>
           {% endif %}
-          <form method="post" action="/transactions/{{ item.id }}/delete" onsubmit="return confirm('Hapus draft ini?')">
+          <form method="post" action="/transactions/{{ item.id }}/delete" onsubmit="return requestConfirm(this, 'Hapus draft ini?')">
             <input type="hidden" name="period" value="{{ period }}">
             <button class="btn btn-ghost btn-danger" type="submit">Hapus</button>
           </form>
