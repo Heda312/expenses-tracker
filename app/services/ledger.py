@@ -4,7 +4,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import Account, Budget, Category, Transaction
-from app.services.dates import current_period, month_bounds, period_label, shift_period
+from app.services.dates import current_period, month_bounds, period_label, shift_period, now_local, to_utc
+from datetime import datetime, timedelta
 
 ACTIVE = (Transaction.status == "confirmed", Transaction.deleted_at.is_(None))
 
@@ -63,6 +64,58 @@ def summary(db: Session, period: str) -> dict:
         "net": income - expense,
         "count": int(count or 0),
     }
+
+
+def analytics(db: Session, period: str) -> dict:
+    """Insight ringkas berbasis query deterministik untuk dashboard dan bot."""
+    current = summary(db, period)
+    previous = summary(db, shift_period(period, -1))
+    start, end = month_bounds(period)
+    days = max((end - start).days, 1)
+    categories = category_totals(db, period, kind="expense", limit=3)
+    merchants = db.execute(
+        select(Transaction.merchant, func.sum(Transaction.amount))
+        .where(Transaction.kind == "expense", Transaction.merchant.is_not(None),
+               Transaction.occurred_at >= start, Transaction.occurred_at < end, *ACTIVE)
+        .group_by(Transaction.merchant).order_by(func.sum(Transaction.amount).desc()).limit(5)
+    ).all()
+    return {
+        **current,
+        "previous_income": previous["income"],
+        "previous_expense": previous["expense"],
+        "income_change_pct": round((current["income"] - previous["income"]) / previous["income"] * 100) if previous["income"] else 0,
+        "expense_change_pct": round((current["expense"] - previous["expense"]) / previous["expense"] * 100) if previous["expense"] else 0,
+        "daily_average": round(current["expense"] / days),
+        "top_category": categories[0] if categories else None,
+        "top_merchants": [{"name": name, "total": int(total or 0)} for name, total in merchants],
+    }
+
+
+def range_summary(db: Session, start: datetime, end: datetime) -> dict:
+    """Ringkasan pemasukan/pengeluaran untuk rentang waktu lokal yang sudah UTC."""
+    income = _sum(db, Transaction.kind == "income", Transaction.occurred_at >= start, Transaction.occurred_at < end, *ACTIVE)
+    expense = _sum(db, Transaction.kind == "expense", Transaction.occurred_at >= start, Transaction.occurred_at < end, *ACTIVE)
+    expense_count = db.scalar(select(func.count(Transaction.id)).where(Transaction.kind == "expense", Transaction.occurred_at >= start, Transaction.occurred_at < end, *ACTIVE)) or 0
+    income_count = db.scalar(select(func.count(Transaction.id)).where(Transaction.kind == "income", Transaction.occurred_at >= start, Transaction.occurred_at < end, *ACTIVE)) or 0
+    return {"income": income, "expense": expense, "net": income - expense, "count": int(expense_count + income_count), "expense_count": int(expense_count), "income_count": int(income_count)}
+
+
+def named_range_summary(db: Session, scope: str) -> dict:
+    """Ringkasan hari/minggu/bulan berdasarkan timezone aplikasi."""
+    local_now = now_local()
+    today = local_now.date()
+    if scope == "day":
+        local_start = datetime.combine(today, datetime.min.time(), tzinfo=local_now.tzinfo)
+        label = "Hari ini"
+    elif scope == "week":
+        local_start = datetime.combine(today - timedelta(days=today.weekday()), datetime.min.time(), tzinfo=local_now.tzinfo)
+        label = "Minggu ini"
+    else:
+        local_start = local_now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        label = "Bulan ini"
+    local_end = local_now
+    data = range_summary(db, to_utc(local_start), to_utc(local_end + timedelta(seconds=1)))
+    return {**data, "label": label}
 
 
 def cashflow(db: Session, months: int = 6, end_period: str | None = None) -> list[dict]:
