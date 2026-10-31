@@ -1094,25 +1094,33 @@ dialog::backdrop {
 
 /* Dashboard cards mengikuti lebar layar dan tinggi konten, bukan jarak tetap. */
 .dashboard-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
-  gap: 14px;
-  align-items: start;
-  margin-bottom: 14px;
+  display: contents;
 }
 
-.dashboard-cards > .card {
-  min-width: 0;
-  height: fit-content;
+.dashboard-masonry {
+  column-count: 2;
+  column-gap: 14px;
 }
 
 .dashboard-cards-wide {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  display: contents;
 }
 
-.dashboard-cards .card,
-.dashboard-cards-wide .card {
+.dashboard-masonry > .grid-2 {
+  display: contents;
+}
+
+.dashboard-masonry > .dashboard-cards > .card,
+.dashboard-masonry > .dashboard-cards-wide > .card,
+.dashboard-masonry > .grid-2 > .card {
+  display: inline-block;
+  width: 100%;
+  min-width: 0;
+  height: fit-content;
+  margin: 0 0 14px;
+  vertical-align: top;
   padding: 18px;
+  break-inside: avoid;
 }
 
 .dashboard-cards .card-head {
@@ -1122,6 +1130,12 @@ dialog::backdrop {
 .dashboard-cards .stack,
 .dashboard-cards .list {
   gap: 10px;
+}
+
+@media (max-width: 760px) {
+  .dashboard-masonry {
+    column-count: 1;
+  }
 }
 
 .export-menu { position: relative; }
