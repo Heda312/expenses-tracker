@@ -15,11 +15,7 @@
         <div class="export-menu-panel">
           <strong>Export {{ period }}</strong>
           <a href="/export.xlsx?period={{ period }}">Excel laporan</a>
-          <a href="/export/umum.csv?period={{ period }}">CSV umum</a>
-          <a href="/export/bca.csv?period={{ period }}">Format bank BCA</a>
-          <a href="/export/mandiri.csv?period={{ period }}">Format bank Mandiri</a>
-          <a href="/export/bri.csv?period={{ period }}">Format bank BRI</a>
-          <a href="/export/ewallet.csv?period={{ period }}">Format e-wallet</a>
+          <a href="/export/umum.csv?period={{ period }}">CSV transaksi</a>
         </div>
       </details>
     {% endif %}
@@ -99,7 +95,12 @@
           <label class="hint">Kategori</label>
           <select id="preview-category" style="width:100%">
             <option value="">Tanpa kategori</option>
-            {% for category in categories %}<option value="{{ category.id }}">{{ category.name }}</option>{% endfor %}
+            <optgroup label="Pengeluaran">
+              {% for category in categories if category.kind == 'expense' %}<option value="{{ category.id }}">{{ category.name }}</option>{% endfor %}
+            </optgroup>
+            <optgroup label="Pemasukan">
+              {% for category in categories if category.kind == 'income' %}<option value="{{ category.id }}">{{ category.name }}</option>{% endfor %}
+            </optgroup>
           </select>
         </div>
         <div style="margin-top:6px">
@@ -135,9 +136,8 @@
     <label for="f-category">Kategori</label>
     <select id="f-category" name="category_id">
       <option value="">Semua</option>
-      {% for category in categories %}
-        <option value="{{ category.id }}" {% if category_id == category.id|string %}selected{% endif %}>{{ category.name }}</option>
-      {% endfor %}
+      <optgroup label="Pengeluaran">{% for category in categories if category.kind == 'expense' %}<option value="{{ category.id }}" {% if category_id == category.id|string %}selected{% endif %}>{{ category.name }}</option>{% endfor %}</optgroup>
+      <optgroup label="Pemasukan">{% for category in categories if category.kind == 'income' %}<option value="{{ category.id }}" {% if category_id == category.id|string %}selected{% endif %}>{{ category.name }}</option>{% endfor %}</optgroup>
     </select>
   </div>
   <div class="field">
@@ -295,9 +295,8 @@
         <label for="tx-category">Kategori</label>
         <select id="tx-category" name="category_id">
           <option value="">Tanpa kategori</option>
-          {% for category in categories %}
-            <option value="{{ category.id }}">{{ category.name }}</option>
-          {% endfor %}
+          <optgroup label="Pengeluaran">{% for category in categories if category.kind == 'expense' %}<option value="{{ category.id }}">{{ category.name }}</option>{% endfor %}</optgroup>
+          <optgroup label="Pemasukan">{% for category in categories if category.kind == 'income' %}<option value="{{ category.id }}">{{ category.name }}</option>{% endfor %}</optgroup>
         </select>
       </div>
 
