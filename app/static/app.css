@@ -117,9 +117,13 @@ h2 {
   height: 24px;
   flex: none;
   border-radius: 9px;
-  background: radial-gradient(circle at 30% 30%, #67e8f9, transparent 55%),
-    linear-gradient(135deg, #22d3ee 0%, #a78bfa 100%);
-  box-shadow: 0 10px 40px -18px rgba(34, 211, 238, 0.9);
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #32145f 0%, #180d32 100%);
+  color: #d8b4fe;
+  font-size: 14px;
+  font-weight: 800;
+  box-shadow: 0 10px 40px -18px rgba(124, 58, 237, 0.9), inset 0 0 0 1px rgba(216, 180, 254, .28);
   position: relative;
 }
 
@@ -130,6 +134,22 @@ h2 {
   border-radius: 8px;
   background: radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.18), transparent 70%);
 }
+
+.page-decoration {
+  position: fixed;
+  pointer-events: none;
+  z-index: -1;
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+  filter: blur(12px);
+  opacity: .28;
+}
+
+.page-decoration-one { top: -130px; right: 8%; background: rgba(124, 58, 237, .22); }
+.page-decoration-two { bottom: 4%; left: 22%; width: 180px; height: 180px; background: rgba(34, 211, 238, .1); }
+
+.mobile-brand { display: none; }
 
 .brand-name {
   display: flex;
@@ -1064,6 +1084,15 @@ dialog::backdrop {
 
   .main {
     padding: 22px 18px 56px;
+  }
+
+  .mobile-brand {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin: 0 0 18px;
+    color: var(--text);
+    font-size: 16px;
   }
 
   .stats {
