@@ -11,6 +11,7 @@ from app.security import require_user
 from app.services.dates import format_dt, month_bounds, valid_period
 from app.services import ledger
 from app.services.xlsx import build_workbook
+from app.services.export_formats import build_bank_csv
 
 router = APIRouter()
 
@@ -40,7 +41,9 @@ def export_excel(
 
     rows = [
         {
-            "date": format_dt(item.occurred_at),
+            "id": item.id,
+            "date": format_dt(item.occurred_at).rsplit(" ", 1)[0],
+            "time": format_dt(item.occurred_at).rsplit(" ", 1)[-1],
             "kind": item.kind,
             "category": item.category.name if item.category else "-",
             "account": item.account.name if item.account else "-",
@@ -64,3 +67,18 @@ def export_excel(
         media_type=MEDIA_TYPE,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.get("/export/{format_name}.csv")
+def export_csv(
+    format_name: str,
+    period: str = Query(""),
+    db: Session = Depends(get_db),
+    _user=Depends(require_user),
+):
+    period = valid_period(period or None)
+    start, end = month_bounds(period)
+    transactions = db.scalars(select(Transaction).where(Transaction.deleted_at.is_(None), Transaction.status == "confirmed", Transaction.occurred_at >= start, Transaction.occurred_at < end).order_by(Transaction.occurred_at.asc())).all()
+    rows = [{"id": item.id, "date": format_dt(item.occurred_at).rsplit(" ", 1)[0], "time": format_dt(item.occurred_at).rsplit(" ", 1)[-1], "kind": item.kind, "category": item.category.name if item.category else "-", "account": item.account.name if item.account else "-", "merchant": item.merchant or item.note or "-", "amount": item.amount} for item in transactions]
+    content = build_bank_csv(rows, format_name).getvalue().encode("utf-8-sig")
+    return Response(content=content, media_type="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="catat-{format_name}-{period}.csv"'})
