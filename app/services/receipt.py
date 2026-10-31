@@ -57,6 +57,16 @@ def _last_amount(text: str) -> int | None:
     return None
 
 
+def _currency_amounts(text: str) -> list[int]:
+    """Ambil semua angka yang jelas ditandai Rp/IDR."""
+    values = []
+    for match in re.finditer(r"(?:rp\.?|idr)\s*[-:]?\s*([\d.,]+)", text, re.I):
+        value = parse_amount(match.group(1))
+        if value and value >= 1000:
+            values.append(value)
+    return values
+
+
 def _find_total(lines: list[dict]) -> tuple[int | None, bool]:
     if not lines:
         return None, False
@@ -77,6 +87,14 @@ def _find_total(lines: list[dict]) -> tuple[int | None, bool]:
                         break
         if amount:
             return amount, True
+
+    # OCR sering memisahkan label dan nominal. Cari semua nominal berlabel Rp.
+    currency_values = []
+    for line in lines:
+        if not EXCLUDE_PATTERN.search(line["text"]):
+            currency_values.extend(_currency_amounts(line["text"]))
+    if currency_values:
+        return max(currency_values), False
 
     # 2) Baris ada "Rp" + nominal gede, ambil yang paling bawah
     rp_list = []
