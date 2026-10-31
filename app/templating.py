@@ -30,7 +30,9 @@ FLASH_MESSAGES = {
     "invalid": ("err", "Data tidak valid. Periksa kembali isian Anda."),
     "notfound": ("err", "Data tidak ditemukan."),
     "no-select": ("err", "Pilih minimal satu transaksi."),
-    "wrong": ("err", "Email atau password salah."),
+    "wrong": ("err", "Username atau password salah."),
+    "setup-invalid": ("err", "Username minimal 3 karakter dan password minimal 12 karakter."),
+    "setup-success": ("ok", "Akun berhasil dibuat. Silakan masuk."),
     "locked": ("err", "Terlalu banyak percobaan. Coba lagi beberapa menit lagi."),
     "invalidlink": ("err", "Tautan tidak valid."),
 }

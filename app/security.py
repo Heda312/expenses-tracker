@@ -91,21 +91,21 @@ def _count_attempts(db: Session, identifier: str) -> int:
     )
 
 
-def is_login_locked(db: Session, email: str, ip: str | None) -> bool:
-    return _count_attempts(db, f"email:{email.lower()}") >= settings.login_max_attempts or (
+def is_login_locked(db: Session, username: str, ip: str | None) -> bool:
+    return _count_attempts(db, f"username:{username.lower()}") >= settings.login_max_attempts or (
         ip is not None and _count_attempts(db, f"ip:{ip}") >= settings.login_max_attempts
     )
 
 
-def record_login_failure(db: Session, email: str, ip: str | None) -> None:
-    db.add(LoginAttempt(identifier=f"email:{email.lower()}"))
+def record_login_failure(db: Session, username: str, ip: str | None) -> None:
+    db.add(LoginAttempt(identifier=f"username:{username.lower()}"))
     if ip:
         db.add(LoginAttempt(identifier=f"ip:{ip}"))
     db.commit()
 
 
-def clear_login_failures(db: Session, email: str) -> None:
-    db.execute(delete(LoginAttempt).where(LoginAttempt.identifier == f"email:{email.lower()}"))
+def clear_login_failures(db: Session, username: str) -> None:
+    db.execute(delete(LoginAttempt).where(LoginAttempt.identifier == f"username:{username.lower()}"))
     db.commit()
 
 

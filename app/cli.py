@@ -1,7 +1,7 @@
 """Perintah baris perintah.
 
 Contoh:
-    python -m app.cli create-user --email saya@contoh.com
+    python -m app.cli create-user --username saya
     python -m app.cli seed
 """
 
@@ -22,8 +22,8 @@ def _gen_password() -> str:
     return "".join(secrets.choice(chars) for _ in range(16))
 
 
-def create_user(email: str, password: str | None) -> None:
-    email = email.strip().lower()
+def create_user(username: str, password: str | None) -> None:
+    username = username.strip().lower()
     if not password:
         password = _gen_password()
         print(f"Password di-generate: {password}")
@@ -32,13 +32,13 @@ def create_user(email: str, password: str | None) -> None:
         raise SystemExit("Password minimal 12 karakter.")
 
     with SessionLocal() as db:
-        if db.scalar(select(User).where(User.email == email)):
-            raise SystemExit("Email sudah terdaftar.")
+        if db.scalar(select(User).where(User.username == username)):
+            raise SystemExit("Username sudah terdaftar.")
 
-        db.add(User(email=email, password_hash=hash_password(password)))
+        db.add(User(username=username, password_hash=hash_password(password)))
         db.commit()
 
-    print(f"User dibuat: {email}")
+    print(f"User dibuat: {username}")
 
 
 def main() -> None:
@@ -46,7 +46,7 @@ def main() -> None:
     sub = parser.add_subparsers(dest="command", required=True)
 
     create = sub.add_parser("create-user", help="Buat akun untuk login")
-    create.add_argument("--email", required=True)
+    create.add_argument("--username", required=True)
     create.add_argument("--password", default=None)
 
     sub.add_parser("seed", help="Isi kategori dan dompet default")
@@ -54,7 +54,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.command == "create-user":
-        create_user(args.email, args.password)
+        create_user(args.username, args.password)
     elif args.command == "seed":
         with SessionLocal() as db:
             ensure_seed(db)

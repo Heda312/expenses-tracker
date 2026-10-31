@@ -9,7 +9,7 @@ Pencatat pengeluaran dengan input via Telegram bot (foto struk + teks) dan web d
 - Budget per kategori dengan progress bar
 - Dompet multiple (tunai, bank, e-wallet)
 - Kategori auto-detect: merchant alias → keyword → fuzzy → LLM → "Lainnya"
-- Single-user login, session DB-backed, lockout 5 failed/15 menit
+- Login username/password, akun pertama dibuat saat setup, session DB-backed, lockout 5 failed/15 menit
 - SQLite + WAL (baca/tulis paralel bot + web)
 - Data: uang INTEGER rupiah, waktu UTC (tampilAsia/Jakarta)
 
@@ -45,7 +45,7 @@ python -m alembic upgrade head
 5. Buat user login:
 
 ```bash
-python -m app.cli create-user --email anda@contoh.com
+python -m app.cli create-user --username anda
 ```
 
 6. Jalankan server:
