@@ -1,171 +1,348 @@
-# Catat —Expense Tracker Sederhana
+# Catat — Expense Tracker Sederhana
 
-Pencatat pengeluaran dengan input via Telegram bot (foto struk + teks) dan web dashboard.
+Aplikasi pencatat keuangan dengan input via Telegram bot (foto struk + teks natural) dan web dashboard interaktif.
 
-## Fitur
+**Versi 2.0.0** — Update besar dengan kategori custom, import CSV, dan CRUD dinamis via bot.
 
-- Telegram bot: kirim struk/foto, OCR otomatis, konfirmasi via tombol inline
-- Web app: dashboard gelap, filter, edit, hapus, export Excel dan CSV
-- Budget per kategori dengan progress bar
-- Dompet multiple (tunai, bank, e-wallet)
-- Kategori auto-detect: merchant alias → keyword → fuzzy → LLM → "Lainnya"
-- Single-user login, session DB-backed, lockout 5 failed/15 menit
-- SQLite + WAL (baca/tulis paralel bot + web)
-- Data: uang INTEGER rupiah, waktu UTC (tampilAsia/Jakarta)
+## ✨ Fitur Utama
 
-## Prasyarat
+### Telegram Bot
+- 📸 **OCR Struk** - Upload foto, ekstrak nominal otomatis
+- 💬 **Natural Language** - "makan siang 35rb", "gaji 8jt masuk bca"
+- 📁 **CRUD Kategori** - Tambah, hapus, ubah kategori via chat
+- 📊 **Query Info** - Tanya status keuangan, budget, transaksi
+- 💼 **Budget Management** - Atur budget dengan konfirmasi interaktif
+- 📥 **Import CSV** - Upload transaksi bulk via bot
 
-- Python 3.11+ (untuk dev)
-- Docker & Docker Compose (untuk deploy)
-- Token bot Telegram
-- (Opsional) Akun Ollama lokal untuk kategori LLM
+### Web Dashboard
+- 🎨 **UI Modern** - Design minimalis, elegan, responsive
+- 📁 **Kategori Custom** - Kelola kategori sendiri, tanpa seed default
+- 📥 **Import/Export** - Import CSV, export Excel & CSV
+- 🔍 **Filter Periode** - Lihat transaksi per bulan atau semua periode
+- 💰 **Multi-Wallet** - Tunai, bank, e-wallet
+- 📊 **Budget Tracking** - Progress bar per kategori
+- 🌙 **Dark Mode** - Theme gelap by default
 
-## Dev Setup (Windows/Linux)
+## 🚀 Quick Start
 
-1. Clone atau copy project ini ke folder lokal
-2. Install dependencies:
+### Prasyarat
+- Python 3.11+
+- Docker & Docker Compose (untuk production)
+- Token bot Telegram dari @BotFather
+- (Opsional) Ollama untuk kategori LLM
+
+### Setup Development
 
 ```bash
+# 1. Clone repository
+git clone <repo-url>
+cd expenses
+
+# 2. Install dependencies
 python -m pip install -r requirements-dev.txt
-```
 
-3. Copy `.env.example` ke `.env`, sesuaikan:
-
-```bash
+# 3. Setup environment
 cp .env.example .env
-# edit .env
-```
+# Edit .env: SECRET_KEY, TELEGRAM_BOT_TOKEN, dll
 
-4. Jalankan migrasi:
-
-```bash
+# 4. Migrasi database
 python -m alembic upgrade head
-```
 
-5. Buat user login:
+# 5. Buat user
+python -m app.cli create-user --email user@example.com
 
-```bash
-python -m app.cli create-user --email anda@contoh.com
-```
-
-6. Jalankan server:
-
-```bash
+# 6. Jalankan server
 uvicorn app.main:app --reload
+
+# 7. Akses dashboard
+# http://localhost:8000
 ```
 
-7. Buka `http://localhost:8000`
-
-## Deploy dengan Docker di Linux
-
-1. Install Docker Engine dan Compose plugin.
-2. Copy project ke Linux VPS/homelab.
-3. Buat `.env`:
+### Deploy dengan Docker
 
 ```bash
+# 1. Setup environment
 cp .env.example .env
 mkdir -p data/uploads
 chmod 700 data
-# edit .env: SECRET_KEY, DATABASE_URL, Telegram
-```
+# Edit .env sesuai kebutuhan
 
-4. Build dan jalankan:
-
-```bash
+# 2. Build dan run
 docker compose build
 docker compose up -d
+
+# 3. Cek status
 docker compose ps
 docker compose logs -f app
+
+# 4. Akses di http://IP_SERVER:8000
 ```
 
-5. Akses `http://IP_SERVER:8000`. Cloudflare Tunnel opsional:
+## 📱 Setup Telegram Bot
 
-```bash
-TUNNEL_TOKEN=... docker compose --profile tunnel up -d
-```
-
-Ollama opsional:
-
-```bash
-docker compose --profile llm up -d
-docker compose exec ollama ollama pull qwen2.5:0.5b-instruct
-```
-
-Set URL Compose di `.env`:
-
+1. Buat bot via @BotFather, dapatkan token
+2. Dapatkan chat_id dari @userinfobot
+3. Tambahkan ke `.env`:
 ```env
-LLM_ENABLED=true
-OLLAMA_URL=http://ollama:11434
+TELEGRAM_BOT_TOKEN=your_bot_token
+TELEGRAM_ALLOWED_CHAT_ID=your_chat_id
 ```
 
-Backup data:
+Bot hanya akan merespons chat dari `TELEGRAM_ALLOWED_CHAT_ID` yang terdaftar.
 
-```bash
-docker compose stop app
-tar -czf catat-backup-$(date +%F).tar.gz data/
-docker compose start app
+## 💬 Perintah Bot Telegram
+
+### Transaksi
+```
+makan siang 35rb
+parkir 5rb pake gopay
+gaji 8jt masuk bca
 ```
 
-Update:
-
-```bash
-git pull
-docker compose build --pull
-docker compose up -d
+### CRUD Kategori
+```
+tambah kategori Snack
+hapus kategori Transport
+ubah kategori Makan jadi Makanan
+/kategori                    # List semua kategori
 ```
 
-## Telegram Bot
+### Budget
+```
+budget makanan 2jt
+atur budget transportasi 500rb
+/budget                      # Status budget semua kategori
+```
 
-1. Buat bot via @BotFather, dapat token
-2. Dapatkan `chat_id` Anda via @userinfobot
-3. Set di `.env`:
-   - `TELEGRAM_BOT_TOKEN=...`
-   - `TELEGRAM_ALLOWED_CHAT_ID=<id-anda>`
+### Query Info
+```
+berapa sisa saldo
+berapa kategori
+kategori apa saja
+berapa transaksi bulan ini
+budget apa saja
+pengeluaran per kategori
+merchant terbanyak
+```
 
-Bot hanya merespons chat dari `TELEGRAM_ALLOWED_CHAT_ID`.
+### Laporan
+```
+/ringkasan                   # Kondisi keuangan bulan ini
+/saldo                       # Saldo semua dompet
+/pengeluaran                 # Total pengeluaran
+/pemasukan                   # Total pemasukan
+```
 
-## OCR & LLM
+### Import
+```
+/import                      # Instruksi import CSV
+# Upload file CSV dengan format yang didukung
+```
 
-- OCR mencoba RapidOCR lalu fallback EasyOCR (`id`, `en`), keduanya cross-platform Linux
-- Kategori auto-detect: 5 layer
-- LLM (Ollama) hanya dipakai kalau `LLM_ENABLED=true` dan gagal 4 layer pertama
+## 📊 Format CSV untuk Import
 
-## Struktur Project
+### Header (opsional, auto-detect):
+```csv
+tanggal,nominal,kategori,merchant,dompet
+```
+
+### Contoh Data:
+```csv
+2026-11-01,50000,Makanan,Indomaret,Cash
+01/11/2026,100000,Transport,Grab,GoPay
+2026-11-02,35000,Snack,,Tunai
+```
+
+**Format yang didukung:**
+- Tanggal: `YYYY-MM-DD`, `DD/MM/YYYY`, `DD-MM-YYYY`, `YYYY/MM/DD`
+- Kategori otomatis dibuat jika belum ada
+- Kolom opsional: merchant, dompet (default ke akun pertama)
+
+## 🗂️ Struktur Project
 
 ```
-.
+expenses/
 ├── app/
-│   ├── __init__.py
-│   ├── config.py
-│   ├── db.py
-│   ├── models.py
-│   ├── seed.py
-│   ├── cli.py
-│   ├── main.py
-│   ├── bot.py
-│   ├── security.py
-│   ├── schemas.py
-│   ├── templating.py
-│   ├── routers/        # auth, dashboard, transactions, accounts, budgets, export, settings
-│   ├── services/       # money, dates, merchant, ocr, receipt, classify, ingest, ledger, xlsx
-│   └── static/         # app.css, app.js
-├── alembic/            # migration scripts
-├── tests/              # pytest
-├── data/               # database + uploads (gitignore)
-├── requirements.txt
-├── requirements-dev.txt
-├── Dockerfile
-├── docker-compose.yml
+│   ├── main.py              # FastAPI app entry
+│   ├── bot.py               # Telegram bot logic
+│   ├── models.py            # SQLAlchemy models
+│   ├── config.py            # Configuration
+│   ├── db.py                # Database session
+│   ├── security.py          # Auth & password
+│   ├── seed.py              # Default data (minimal)
+│   ├── cli.py               # CLI commands
+│   ├── routers/
+│   │   ├── auth.py          # Login/logout
+│   │   ├── dashboard.py     # Dashboard page
+│   │   ├── transactions.py  # Transaksi CRUD
+│   │   ├── accounts.py      # Wallet management
+│   │   ├── budgets.py       # Budget tracking
+│   │   ├── categories.py    # Category CRUD (NEW)
+│   │   ├── export.py        # Excel/CSV export
+│   │   ├── ocr.py           # Receipt OCR
+│   │   └── settings_page.py # Settings & import (NEW)
+│   ├── services/
+│   │   ├── money.py         # Currency parser
+│   │   ├── dates.py         # Date utilities
+│   │   ├── ocr.py           # OCR engines
+│   │   ├── classify.py      # Category detection
+│   │   ├── ledger.py        # Balance calculation
+│   │   └── budget_alerts.py # Budget notifications
+│   ├── templates/           # Jinja2 templates
+│   │   ├── base.html        # Base layout (NEW alert modal)
+│   │   ├── dashboard.html   # Dashboard
+│   │   ├── transactions.html # Transaction list (NEW filter)
+│   │   ├── categories.html  # Category management (NEW)
+│   │   ├── budgets.html     # Budget page
+│   │   └── settings.html    # Settings (NEW import section)
+│   └── static/
+│       ├── app.css          # Global styles
+│       └── app.js           # Global scripts
+├── alembic/                 # Database migrations
+├── tests/                   # Unit tests
+├── data/                    # SQLite + uploads (gitignored)
+├── requirements.txt         # Production deps
+├── requirements-dev.txt     # Dev deps
+├── Dockerfile              
+├── docker-compose.yml      
 └── README.md
 ```
 
-## Troubleshooting
+## 🔧 Teknologi
 
-- Bot tidak merespons? Cek `TELEGRAM_ALLOWED_CHAT_ID`
-- OCR gagal? Pastikan Python <3.13, coba foto lebih terang
-- Uang tidak muncul? Pastikan `DATABASE_URL` benar, jalankan `alembic upgrade head`
-- Dashboard blank? Cek `/login`, pastikan user sudah dibuat
+- **Backend**: FastAPI, SQLAlchemy, Alembic
+- **Bot**: aiogram 3.x
+- **OCR**: RapidOCR, EasyOCR (fallback)
+- **LLM**: Ollama (opsional, untuk kategori)
+- **Database**: SQLite dengan WAL mode
+- **Frontend**: Jinja2, vanilla JS, modern CSS
 
-## License
+## 🎯 Fitur Baru v2.0.0
 
-MIT
+### CRUD Kategori Dinamis
+- ✅ Kategori kosong saat setup awal
+- ✅ User bisa tambah kategori custom
+- ✅ Edit dan hapus kategori via web & bot
+- ✅ Konfirmasi 2-step untuk tambah (pilih jenis + konfirmasi)
+- ✅ Validasi penggunaan kategori di transaksi
+
+### Import/Export Enhanced
+- ✅ Import CSV via web (halaman Settings)
+- ✅ Import CSV via bot Telegram
+- ✅ Auto-detect format CSV
+- ✅ Auto-create kategori baru saat import
+- ✅ Error reporting detail per baris
+
+### Bot Enhancements
+- ✅ Query info dengan periode awareness
+- ✅ "berapa transaksi bulan lalu"
+- ✅ "pengeluaran per kategori"
+- ✅ "merchant terbanyak"
+- ✅ Parser logic improved (prioritas query vs transaksi)
+- ✅ Budget edit dengan input manual (bukan preset)
+
+### UI/UX Improvements
+- ✅ Filter periode transaksi (dropdown selector)
+- ✅ Alert modal global (replace native alert)
+- ✅ Background gradient decoration
+- ✅ Grid layout kategori responsive
+- ✅ Modal close on backdrop click
+- ✅ Button consistency dengan global theme
+- ✅ Typography & spacing optimized
+
+## 📦 Backup & Restore
+
+### Backup
+```bash
+# Stop aplikasi
+docker compose stop app
+
+# Backup database dan uploads
+tar -czf catat-backup-$(date +%F).tar.gz data/
+
+# Start kembali
+docker compose start app
+```
+
+### Restore
+```bash
+docker compose stop app
+tar -xzf catat-backup-YYYY-MM-DD.tar.gz
+docker compose start app
+```
+
+## 🔄 Update dari v1.x ke v2.0.0
+
+```bash
+# 1. Backup data
+docker compose stop app
+tar -czf backup-pre-v2.tar.gz data/
+
+# 2. Pull update
+git pull origin main
+
+# 3. Rebuild
+docker compose build --pull
+
+# 4. Migrasi (jika ada)
+docker compose run --rm app python -m alembic upgrade head
+
+# 5. Start
+docker compose up -d
+
+# 6. Cek logs
+docker compose logs -f app
+```
+
+**Breaking Changes:**
+- Kategori default dihapus - user perlu tambah kategori sendiri
+- Database seed minimal (hanya akun Cash)
+
+## 🐛 Troubleshooting
+
+**Bot tidak merespons?**
+- Cek `TELEGRAM_ALLOWED_CHAT_ID` di `.env`
+- Pastikan bot running: `docker compose logs bot`
+
+**OCR gagal?**
+- Gunakan Python <3.13
+- Foto harus jelas dan terang
+- RapidOCR akan fallback ke EasyOCR
+
+**Import CSV gagal?**
+- Cek format header CSV
+- Pastikan encoding UTF-8
+- Lihat error detail di response
+
+**Web dashboard blank?**
+- Akses `/login` dan login dulu
+- Pastikan user sudah dibuat via CLI
+- Cek browser console untuk error
+
+**Database error?**
+- Pastikan migrasi sudah dijalankan: `alembic upgrade head`
+- Cek `DATABASE_URL` di `.env`
+- Pastikan folder `data/` writeable
+
+## 📝 Contributing
+
+1. Fork repository
+2. Buat branch fitur: `git checkout -b feature/nama-fitur`
+3. Commit perubahan: `git commit -m 'Add: fitur baru'`
+4. Push ke branch: `git push origin feature/nama-fitur`
+5. Buat Pull Request
+
+## 📄 License
+
+MIT License - lihat file LICENSE untuk detail.
+
+## 🙏 Credits
+
+- OCR: RapidOCR, EasyOCR
+- Bot Framework: aiogram
+- Web Framework: FastAPI
+- Icons: Emoji native
+
+---
+
+**Dibuat dengan ❤️ untuk tracking keuangan pribadi yang simple dan powerful**
