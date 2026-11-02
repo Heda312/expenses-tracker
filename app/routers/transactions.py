@@ -407,13 +407,19 @@ def bulk_delete_transactions(
     if not transactions:
         return _back(selected, "notfound")
 
-    # Hapus lunak (soft delete). Saldo dompet otomatis ikut menyesuaikan
-    # karena dihitung dari transaksi yang belum dihapus.
+    # Soft delete. Saldo dompet otomatis sesuai query ledger.py (exclude deleted_at)
     now = utcnow()
-    for transaction in transactions:
-        before = _snapshot(transaction)
-        transaction.deleted_at = now
-        _audit(db, transaction, "delete", before)
+    for tx in transactions:
+        before = _snapshot(tx)
+        tx.deleted_at = now
+        _audit(db, tx, "delete", before)
     db.commit()
+    
+    # Verify deletion by reloading
+    remaining = db.scalars(
+        select(Transaction).where(Transaction.id.in_(tx_ids))
+    ).all()
+    if any(t.deleted_at is None for t in remaining):
+        return _back(selected, "delete-error")
 
     return _back(selected, "deleted")
