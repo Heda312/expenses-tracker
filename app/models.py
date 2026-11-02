@@ -115,7 +115,7 @@ class Transaction(Base):
 class Merchant(Base):
     """Ingatan merchant: hasil normalisasi OCR -> kategori.
 
-    Semakin lengkap tabel ini, semakin jarang LLM dipanggil.
+    Deprecated: LLM removed. OCR/parser only.
     """
 
     __tablename__ = "merchants"
