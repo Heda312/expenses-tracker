@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Daftar · {{ app_name }}</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="card login-card">
+    <div class="login-head">
+      <span class="brand-mark"></span>
+      <div>
+        <h1>Daftar</h1>
+        <p class="muted">Buat akun baru untuk mulai mencatat.</p>
+      </div>
+    </div>
+
+    {% if flash == "deleted" %}
+      <div class="alert success">Akun berhasil dihapus.</div>
+    {% elif flash == "invalid_username" %}
+      <div class="alert error">Username harus 3-190 karakter.</div>
+    {% elif flash == "invalid_password" %}
+      <div class="alert error">Password harus minimal 12 karakter.</div>
+    {% elif flash == "password_mismatch" %}
+      <div class="alert error">Konfirmasi password tidak sama.</div>
+    {% elif flash == "exists" %}
+      <div class="alert error">Username sudah terdaftar.</div>
+    {% endif %}
+
+    <form method="post" action="/register" class="form-grid">
+      <div class="field">
+        <label for="username">Username</label>
+        <input id="username" name="username" type="text" autocomplete="username" required autofocus>
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" minlength="12" autocomplete="new-password" required>
+        <small class="muted">Minimal 12 karakter</small>
+      </div>
+      <div class="field">
+        <label for="confirm-password">Ketik ulang password</label>
+        <input id="confirm-password" name="confirm_password" type="password" minlength="12" autocomplete="new-password" required>
+      </div>
+      <button class="btn btn-primary btn-block" type="submit">Daftar</button>
+      <p class="muted" style="text-align: center; margin-top: 1rem;">
+        Sudah punya akun? <a href="/login">Masuk di sini</a>
+      </p>
+    </form>
+  </div>
+</div>
+</body>
+</html>

@@ -35,7 +35,18 @@ class Settings(BaseSettings):
 
     # Telegram
     telegram_bot_token: str = ""
-    telegram_allowed_chat_id: int | None = None
+    telegram_allowed_chat_id: str = ""  # Changed to string to avoid validation error
+    telegram_webhook_url: str = ""  # Public webhook URL (empty = polling mode)
+    
+    @property
+    def telegram_chat_id(self) -> int | None:
+        """Convert chat ID string to int."""
+        if self.telegram_allowed_chat_id:
+            try:
+                return int(self.telegram_allowed_chat_id)
+            except ValueError:
+                return None
+        return None
 
     # Zona waktu untuk tampilan dan parsing tanggal
     timezone: str = "Asia/Jakarta"

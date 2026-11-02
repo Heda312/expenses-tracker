@@ -85,31 +85,37 @@ async def _flush_media_group(chat_id: int, group_id: str) -> None:
 
 
 HELP_TEXT = (
-    "Kirim foto struk, atau tulis transaksi langsung.\n\n"
-    "Contoh:\n"
-    "  makan siang 35rb\n"
-    "  parkir 5rb pake gopay\n"
-    "  gaji 8jt masuk bca\n\n"
-    "Setiap hasil akan ditampilkan dulu untuk dikonfirmasi.\n\n"
-    "Perintah laporan:\n"
-    "/ringkasan - kondisi keuangan bulan ini\n"
-    "/saldo - saldo semua dompet\n"
-    "/budget - status budget semua kategori\n"
-    "/budget [kategori] - detail budget kategori tertentu\n"
-    "/pengeluaran - total pengeluaran bulan ini\n"
-    "/pemasukan - total pemasukan bulan ini\n"
-    "/transaksi - transaksi terakhir\n"
-    "/harian - spending dan pemasukan hari ini\n"
-    "/mingguan - spending dan pemasukan minggu ini\n"
-    "/bulanan - spending dan pemasukan bulan ini\n\n"
-    "Kelola data:\n"
-    "/kategori - kelola kategori\n"
-    "/import - import transaksi dari CSV\n\n"
-    "Atur budget:\n"
-    "  budget makanan 2jt\n"
-    "  atur budget transportasi 500rb\n"
-    "  set budget belanja 1.5 juta\n\n"
-    "Bot akan kirim notifikasi otomatis saat budget kategori mencapai 60%, 70%, 80%, 90%, dan 100%."
+    "╔════════════════════════╗\n"
+    "║  <b>📚 PANDUAN BOT</b>\n"
+    "╠════════════════════════╣\n\n"
+    "<b>💰 CATAT TRANSAKSI</b>\n"
+    "━━━━━━━━━━━━━━━━━━━━━━\n"
+    "• <code>makan 50rb warteg</code>\n"
+    "• <code>gaji 5jt bonus</code>\n"
+    "• <code>bensin 100k shell</code>\n\n"
+    "<b>📊 LAPORAN</b>\n"
+    "━━━━━━━━━━━━━━━━━━━━━━\n"
+    "• /saldo - Saldo semua akun\n"
+    "• /budget - Monitoring budget\n"
+    "• /ringkasan - Kondisi keuangan\n"
+    "• /pengeluaran - Total expense\n"
+    "• /pemasukan - Total income\n"
+    "• /transaksi - Transaksi terakhir\n\n"
+    "<b>📁 KELOLA KATEGORI</b>\n"
+    "━━━━━━━━━━━━━━━━━━━━━━\n"
+    "• <code>tambah kategori olahraga</code>\n"
+    "• <code>ubah kategori makan jadi makanan</code>\n"
+    "• <code>hapus kategori lain-lain</code>\n\n"
+    "<b>💳 ATUR BUDGET</b>\n"
+    "━━━━━━━━━━━━━━━━━━━━━━\n"
+    "• <code>budget makanan 2jt</code>\n"
+    "• <code>budget transport 500rb</code>\n\n"
+    "<b>💡 TIPS</b>\n"
+    "━━━━━━━━━━━━━━━━━━━━━━\n"
+    "Format: [kategori] [nominal] [keterangan]\n"
+    "Nominal: 50rb, 2jt, 100k, 1.5jt\n"
+    "Otomatis expense, pakai 'gaji/bonus' untuk income\n\n"
+    "╚════════════════════════╝"
 )
 
 
@@ -119,7 +125,8 @@ class EditAmount(StatesGroup):
 
 def _allowed(chat_id: int | None) -> bool:
     """Hanya satu chat yang boleh memakai bot ini."""
-    return settings.telegram_allowed_chat_id is not None and chat_id == settings.telegram_allowed_chat_id
+    allowed_id = settings.telegram_chat_id
+    return allowed_id is not None and chat_id == allowed_id
 
 
 def _keyboard(transaction_id: int) -> InlineKeyboardMarkup:
@@ -2184,7 +2191,7 @@ async def start_bot() -> None:
     dispatcher = Dispatcher(storage=MemoryStorage())
     dispatcher.include_router(router)
 
-    if settings.telegram_allowed_chat_id is None:
+    if settings.telegram_chat_id is None:
         logger.warning("TELEGRAM_ALLOWED_CHAT_ID belum diisi, bot akan mengabaikan semua pesan.")
 
     try:

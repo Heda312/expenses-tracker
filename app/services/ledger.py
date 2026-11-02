@@ -149,13 +149,13 @@ def analytics(db: Session, period: str) -> dict:
                Transaction.occurred_at < end, *ACTIVE)
         .group_by(Account.id).order_by(func.sum(Transaction.amount).desc()).limit(3)
     ).all()
-    savings_rate = round(current["net"] / current["income"] * 100) if current["income"] else None
+    savings_rate = round(current["net"] / current["income"] * 100) if current["income"] > 0 else 0
     return {
         **current,
         "previous_income": previous["income"],
         "previous_expense": previous["expense"],
-        "income_change_pct": round((current["income"] - previous["income"]) / previous["income"] * 100) if previous["income"] else None,
-        "expense_change_pct": round((current["expense"] - previous["expense"]) / previous["expense"] * 100) if previous["expense"] else None,
+        "income_change_pct": round((current["income"] - previous["income"]) / previous["income"] * 100) if previous["income"] > 0 else 0,
+        "expense_change_pct": round((current["expense"] - previous["expense"]) / previous["expense"] * 100) if previous["expense"] > 0 else 0,
         "daily_average": round(current["expense"] / days),
         "active_days": int(active_days),
         "active_daily_average": round(current["expense"] / active_days) if active_days else 0,

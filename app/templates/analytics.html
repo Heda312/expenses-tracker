@@ -1,0 +1,435 @@
+{% extends "base.html" %}
+{% block title %}Analisis Keuangan · {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Analisis Keuangan</h1>
+    <p class="muted">Evaluasi dan insight periode berjalan</p>
+  </div>
+  <div class="period-nav">
+    <a class="btn btn-icon" href="/analytics?period={{ prev_period }}">&lsaquo;</a>
+    <span class="pill">{{ period_label(period) }}</span>
+    <a class="btn btn-icon" href="/analytics?period={{ next_period }}">&rsaquo;</a>
+  </div>
+</div>
+
+{# Health Score Card - Hero Section #}
+<section class="health-hero">
+  <div class="card health-card">
+    <div class="health-score">
+      <div class="score-circle" data-score="{{ health.score }}">
+        <svg viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="45" fill="none" stroke="#2a3441" stroke-width="8"/>
+          <circle cx="50" cy="50" r="45" fill="none" stroke="var(--{{ health.color }})" stroke-width="8"
+                  stroke-dasharray="283" stroke-dashoffset="{{ 283 - (283 * health.score / 100) }}"
+                  transform="rotate(-90 50 50)" stroke-linecap="round"/>
+        </svg>
+        <div class="score-value">
+          <span class="score-number">{{ health.score }}</span>
+          <span class="score-emoji">{{ health.emoji }}</span>
+        </div>
+      </div>
+      <div class="score-info">
+        <h2>Skor Kesehatan Keuangan</h2>
+        <p class="score-grade" style="color: var(--{{ health.color }})">{{ health.grade }}</p>
+        <p class="muted">Evaluasi berdasarkan 4 metrik utama</p>
+      </div>
+    </div>
+    
+    <div class="health-breakdown">
+      <div class="breakdown-item">
+        <span class="breakdown-label">Disiplin Budget</span>
+        <div class="breakdown-bar">
+          <div class="breakdown-fill" style="width: {{ health.breakdown.budget_discipline }}%; background: var(--blue)"></div>
+        </div>
+        <span class="breakdown-score">{{ health.breakdown.budget_discipline }}</span>
+      </div>
+      <div class="breakdown-item">
+        <span class="breakdown-label">Kemampuan Menabung</span>
+        <div class="breakdown-bar">
+          <div class="breakdown-fill" style="width: {{ health.breakdown.savings_ability }}%; background: var(--green)"></div>
+        </div>
+        <span class="breakdown-score">{{ health.breakdown.savings_ability }}</span>
+      </div>
+      <div class="breakdown-item">
+        <span class="breakdown-label">Stabilitas Pemasukan</span>
+        <div class="breakdown-bar">
+          <div class="breakdown-fill" style="width: {{ health.breakdown.income_health }}%; background: var(--income)"></div>
+        </div>
+        <span class="breakdown-score">{{ health.breakdown.income_health }}</span>
+      </div>
+      <div class="breakdown-item">
+        <span class="breakdown-label">Kontrol Pengeluaran</span>
+        <div class="breakdown-bar">
+          <div class="breakdown-fill" style="width: {{ health.breakdown.expense_control }}%; background: var(--expense)"></div>
+        </div>
+        <span class="breakdown-score">{{ health.breakdown.expense_control }}</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+{# Quick Summary Stats #}
+<section class="stats">
+  <div class="card stat">
+    <span class="stat-label">Pemasukan</span>
+    <strong class="stat-value num" style="color: var(--income)">{{ format_idr(summary.income) }}</strong>
+  </div>
+  <div class="card stat">
+    <span class="stat-label">Pengeluaran</span>
+    <strong class="stat-value num" style="color: var(--expense)">{{ format_idr(summary.expense) }}</strong>
+  </div>
+  <div class="card stat">
+    <span class="stat-label">Selisih</span>
+    <strong class="stat-value num {% if summary.net < 0 %}neg{% endif %}">{{ format_idr(summary.net) }}</strong>
+  </div>
+  <div class="card stat">
+    <span class="stat-label">Total Saldo</span>
+    <strong class="stat-value num">{{ format_idr(summary.balance) }}</strong>
+  </div>
+</section>
+
+{# Insights Section #}
+{% if insights %}
+<section class="insights-section">
+  <h2 class="section-title">💡 Insight & Rekomendasi</h2>
+  <div class="insights-grid">
+    {% for insight in insights %}
+      <div class="card insight-card insight-{{ insight.color }}">
+        <div class="insight-icon">{{ insight.icon }}</div>
+        <div class="insight-content">
+          <h3 class="insight-title">{{ insight.title }}</h3>
+          <p class="insight-text">{{ insight.text }}</p>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{# Main Analytics Grid #}
+<section class="grid-2">
+  {# Category Breakdown #}
+  <div class="card">
+    <div class="card-head">
+      <div>
+        <h2 class="card-title">Pengeluaran per Kategori</h2>
+        <p class="card-sub">Total {{ format_idr(summary.expense) }}</p>
+      </div>
+    </div>
+    
+    {% if categories %}
+      <div class="category-list">
+        {% for cat in categories %}
+          <div class="category-item">
+            <div class="category-info">
+              <span class="category-dot" style="background: {{ cat.color }}"></span>
+              <span class="category-name">{{ cat.name }}</span>
+            </div>
+            <div class="category-bar-wrap">
+              <div class="category-bar">
+                <div class="category-fill" style="width: {{ cat.pct }}%; background: {{ cat.color }}"></div>
+              </div>
+            </div>
+            <div class="category-values">
+              <span class="category-amount num">{{ format_idr(cat.total) }}</span>
+              <span class="category-pct">{{ cat.pct }}%</span>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty">Belum ada pengeluaran bulan ini</div>
+    {% endif %}
+  </div>
+
+  {# Budget Progress #}
+  <div class="card">
+    <div class="card-head">
+      <div>
+        <h2 class="card-title">Progress Budget</h2>
+        <p class="card-sub">Pantauan batas pengeluaran</p>
+      </div>
+      <a class="btn btn-sm btn-ghost" href="/budgets?period={{ period }}">Atur</a>
+    </div>
+    
+    {% if budgets %}
+      <div class="stack">
+        {% for item in budgets %}
+          <div class="budget-row">
+            <div class="budget-head">
+              <span class="legend-name">{{ item.name }}</span>
+              <span class="num muted">{{ format_idr(item.spent) }} / {{ format_idr(item.amount) }}</span>
+            </div>
+            <div class="bar {% if item.over %}over{% endif %}">
+              <span style="width: {{ item.pct if item.pct < 100 else 100 }}%"></span>
+            </div>
+            <div class="budget-status">
+              {% if item.over %}
+                <span class="badge badge-danger">Over {{ item.pct }}%</span>
+              {% elif item.pct >= 90 %}
+                <span class="badge badge-warning">{{ item.pct }}%</span>
+              {% elif item.pct >= 70 %}
+                <span class="badge badge-info">{{ item.pct }}%</span>
+              {% else %}
+                <span class="badge badge-ok">{{ item.pct }}%</span>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty">
+        <strong>Belum ada budget</strong>
+        <p>Tentukan batas pengeluaran per kategori</p>
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+{# Cashflow Trend #}
+<section class="card">
+  <div class="card-head">
+    <div>
+      <h2 class="card-title">Tren Arus Kas</h2>
+      <p class="card-sub">6 bulan terakhir</p>
+    </div>
+    <div class="legend">
+      <span><i class="dot" style="background: var(--income)"></i> Masuk</span>
+      <span><i class="dot" style="background: var(--expense)"></i> Keluar</span>
+    </div>
+  </div>
+
+  {% if cashflow %}
+    <div class="chart">
+      {% for month in cashflow %}
+        <div class="chart-col">
+          <div class="chart-bars">
+            <div class="chart-bar income" style="height: {{ month.income_pct }}%"
+                 title="{{ month.label }} masuk: {{ format_idr(month.income) }}"></div>
+            <div class="chart-bar expense" style="height: {{ month.expense_pct }}%"
+                 title="{{ month.label }} keluar: {{ format_idr(month.expense) }}"></div>
+          </div>
+          <span class="chart-label">{{ month.label.split(' ')[0] }}</span>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+</section>
+
+<style>
+.health-hero {
+  margin-bottom: 2rem;
+}
+
+.health-card {
+  padding: 2rem;
+}
+
+.health-score {
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.score-circle {
+  position: relative;
+  width: 160px;
+  height: 160px;
+  flex-shrink: 0;
+}
+
+.score-circle svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(0deg);
+}
+
+.score-value {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
+
+.score-number {
+  display: block;
+  font-size: 2.5rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.score-emoji {
+  display: block;
+  font-size: 2rem;
+  margin-top: 0.25rem;
+}
+
+.score-info h2 {
+  font-size: 1.5rem;
+  margin: 0 0 0.5rem 0;
+}
+
+.score-grade {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem 0;
+}
+
+.health-breakdown {
+  display: grid;
+  gap: 1rem;
+}
+
+.breakdown-item {
+  display: grid;
+  grid-template-columns: 150px 1fr 50px;
+  gap: 1rem;
+  align-items: center;
+}
+
+.breakdown-label {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.breakdown-bar {
+  height: 8px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.breakdown-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.breakdown-score {
+  text-align: right;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.section-title {
+  font-size: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.insights-section {
+  margin-bottom: 2rem;
+}
+
+.insights-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.insight-card {
+  display: flex;
+  gap: 1rem;
+  padding: 1.25rem;
+  border-left: 4px solid;
+}
+
+.insight-card.insight-red { border-color: var(--red); }
+.insight-card.insight-yellow { border-color: var(--yellow); }
+.insight-card.insight-green { border-color: var(--green); }
+.insight-card.insight-blue { border-color: var(--blue); }
+
+.insight-icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+
+.insight-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 0.25rem 0;
+}
+
+.insight-text {
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin: 0;
+}
+
+.category-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.category-item {
+  display: grid;
+  grid-template-columns: 150px 1fr 120px;
+  gap: 1rem;
+  align-items: center;
+}
+
+.category-info {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.category-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.category-name {
+  font-size: 0.9rem;
+}
+
+.category-bar-wrap {
+  min-width: 0;
+}
+
+.category-bar {
+  height: 8px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.category-fill {
+  height: 100%;
+  border-radius: 4px;
+}
+
+.category-values {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.category-amount {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.category-pct {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.budget-status {
+  margin-top: 0.5rem;
+}
+
+.badge-danger { background: var(--red); color: white; }
+.badge-warning { background: var(--yellow); color: var(--text); }
+.badge-info { background: var(--blue); color: white; }
+.badge-ok { background: var(--green); color: white; }
+</style>
+{% endblock %}

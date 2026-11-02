@@ -6,6 +6,7 @@ Menjalankan:
 
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -18,6 +19,7 @@ from app.db import SessionLocal
 from app.routers import accounts, auth, budgets, categories, dashboard, export, ocr, settings_page, transactions
 from app.security import RedirectToLogin, require_user
 from app.seed import ensure_seed
+from app import webhook
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -28,17 +30,17 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     # Pastikan schema tersedia sebelum route setup/login membaca tabel users.
-    # Docker menjalankan migration sebelum Uvicorn, tetapi guard ini membuat
-    # local/dev start tetap aman saat database baru masih kosong.
-    try:
-        from alembic import command
-        from alembic.config import Config
+    # Set AUTO_MIGRATE=false di .env untuk disable auto-migration
+    if os.getenv("AUTO_MIGRATE", "true").lower() != "false":
+        try:
+            from alembic import command
+            from alembic.config import Config
 
-        alembic_config = Config(str(Path(__file__).resolve().parent.parent / "alembic.ini"))
-        command.upgrade(alembic_config, "head")
-    except Exception:
-        logger.exception("Migrasi database gagal saat startup")
-        raise
+            alembic_config = Config(str(Path(__file__).resolve().parent.parent / "alembic.ini"))
+            command.upgrade(alembic_config, "head")
+        except Exception:
+            logger.exception("Migrasi database gagal saat startup")
+            raise
 
     # Isi kategori & dompet default saat pertama kali dijalankan.
     with SessionLocal() as db:
@@ -117,3 +119,4 @@ app.include_router(budgets.router)
 app.include_router(export.router)
 app.include_router(ocr.router)
 app.include_router(settings_page.router)
+app.include_router(webhook.router)

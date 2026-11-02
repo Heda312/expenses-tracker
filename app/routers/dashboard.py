@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.db import get_db
 from app.models import Transaction
@@ -34,10 +34,13 @@ def dashboard_page(
     insights = dashboard.auto_insights(db, summary, comparison, categories)
     active = (Transaction.status == "confirmed", Transaction.deleted_at.is_(None))
     
-    # Transactions: default all-time (not filtered by period)
+    # Transactions: default all-time (not filtered by period) with eager loading
     transactions = db.scalars(
-        select(Transaction).where(*active)
-        .order_by(Transaction.occurred_at.desc(), Transaction.id.desc()).limit(10)
+        select(Transaction)
+        .options(joinedload(Transaction.category), joinedload(Transaction.account))
+        .where(*active)
+        .order_by(Transaction.occurred_at.desc(), Transaction.id.desc())
+        .limit(10)
     ).all()
 
     return templates.TemplateResponse(request, "dashboard.html", {
