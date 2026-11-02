@@ -211,22 +211,13 @@ Reference ID
 - Dynamic masonry dashboard.
 - Tidak menggunakan dependency JavaScript tambahan.
 
-## AI dan Ollama
+## OCR/parser only (LLM removed)
 
-Ollama bersifat optional:
-
-```env
-LLM_ENABLED=false
-OLLAMA_URL=http://localhost:11434
-OLLAMA_MODEL=qwen2.5:0.5b-instruct
-OLLAMA_TIMEOUT=12.0
-```
-
-Ollama digunakan sebagai fallback klasifikasi merchant dan kategori. Perhitungan finansial tetap dilakukan oleh Python dan SQL agar nominal, saldo, dan laporan akurat.
+OCR/parser config:
 
 ## Deployment Docker
 
-Project menyediakan Dockerfile Linux berbasis Python 3.12 slim, Docker Compose, persistent volume, dependency OCR Linux, healthcheck `/health`, auto migration Alembic, optional Cloudflare Tunnel, optional Ollama, dan `.dockerignore`.
+Project menyediakan Dockerfile Linux berbasis Python 3.12 slim, Docker Compose, persistent volume, dependency OCR Linux, healthcheck `/health`, auto migration Alembic, optional Cloudflare Tunnel, dan `.dockerignore`.
 
 ### Setup Linux
 
@@ -261,20 +252,6 @@ Cloudflare Tunnel optional:
 
 ```bash
 TUNNEL_TOKEN=... docker compose --profile tunnel up -d
-```
-
-Ollama optional:
-
-```bash
-docker compose --profile llm up -d
-docker compose exec ollama ollama pull qwen2.5:0.5b-instruct
-```
-
-Jika Ollama berjalan di Compose:
-
-```env
-LLM_ENABLED=true
-OLLAMA_URL=http://ollama:11434
 ```
 
 Backup:

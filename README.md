@@ -29,7 +29,7 @@ Aplikasi pencatat keuangan dengan input via Telegram bot (foto struk + teks natu
 - Python 3.11+
 - Docker & Docker Compose (untuk production)
 - Token bot Telegram dari @BotFather
-- (Opsional) Ollama untuk kategori LLM
+- OCR: RapidOCR, EasyOCR (fallback)
 
 ### Setup Development
 
@@ -213,7 +213,7 @@ expenses/
 - **Backend**: FastAPI, SQLAlchemy, Alembic
 - **Bot**: aiogram 3.x
 - **OCR**: RapidOCR, EasyOCR (fallback)
-- **LLM**: Ollama (opsional, untuk kategori)
+- **OCR**: RapidOCR, EasyOCR (fallback)
 - **Database**: SQLite dengan WAL mode
 - **Frontend**: Jinja2, vanilla JS, modern CSS
 
