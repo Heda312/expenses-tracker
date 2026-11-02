@@ -54,11 +54,7 @@ class Settings(BaseSettings):
     # Zona waktu untuk tampilan dan parsing tanggal
     timezone: str = "Asia/Jakarta"
 
-    # LLM lokal (opsional). Kalau false, sistem tetap jalan penuh.
-    llm_enabled: bool = False
-    ollama_url: str = "http://localhost:11434"
-    ollama_model: str = "qwen2.5:0.5b-instruct"
-    ollama_timeout: float = 3.0
+    # LLM removed - OCR/parser only
 
 
 settings = Settings()
