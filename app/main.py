@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.db import SessionLocal
-from app.routers import accounts, auth, budgets, dashboard, export, ocr, settings_page, transactions
+from app.routers import accounts, auth, budgets, categories, dashboard, export, ocr, settings_page, transactions
 from app.security import RedirectToLogin, require_user
 from app.seed import ensure_seed
 
@@ -60,7 +60,17 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
 @app.exception_handler(RedirectToLogin)
-async def _redirect_to_login(_request: Request, _exc: RedirectToLogin):
+async def _redirect_to_login(request: Request, _exc: RedirectToLogin):
+    # Check if database has any users
+    with SessionLocal() as db:
+        from sqlalchemy import select
+        from app.models import User
+        has_users = db.scalar(select(User.id).limit(1)) is not None
+    
+    # If no users exist and not already on register page, redirect to register
+    if not has_users and not request.url.path.startswith("/register"):
+        return RedirectResponse("/register", status_code=303)
+    
     return RedirectResponse("/login", status_code=303)
 
 
@@ -89,6 +99,7 @@ app.include_router(auth.router)
 app.include_router(dashboard.router)
 app.include_router(transactions.router)
 app.include_router(accounts.router)
+app.include_router(categories.router)
 app.include_router(budgets.router)
 app.include_router(export.router)
 app.include_router(ocr.router)
