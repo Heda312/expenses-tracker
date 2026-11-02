@@ -738,7 +738,7 @@ async def _handle_info_query(db: Session, question: str) -> str | None:
         
         from app.services.ledger import account_balances
         balances = account_balances(db)
-        balance_map = {b['account_id']: b['balance'] for b in balances}
+        balance_map = {b['id']: b['balance'] for b in balances}
         
         for acc in accounts:
             balance = balance_map.get(acc.id, 0)
@@ -909,6 +909,91 @@ async def _handle_info_query(db: Session, question: str) -> str | None:
         
         return "\n".join(lines)
     
+    # Query transaksi/pengeluaran untuk merchant tertentu, mis. "pengeluaran di indomaret"
+    if any(w in question for w in ("pengeluaran", "belanja", "transaksi", "riwayat", "berapa", "total")):
+        known_merchants = db.scalars(
+            select(Transaction.merchant)
+            .where(Transaction.merchant.isnot(None), Transaction.deleted_at.is_(None))
+            .distinct()
+        ).all()
+        mentioned = [m for m in known_merchants if m and m.lower() in question]
+
+        if mentioned:
+            # Periode: minggu ini kalau disebut, selain itu bulan berjalan.
+            if "minggu" in question:
+                today = now_local().date()
+                start_day = today - timedelta(days=today.weekday())
+                start = to_utc(
+                    datetime.combine(start_day, datetime.min.time(), tzinfo=now_local().tzinfo)
+                )
+                end = to_utc(now_local() + timedelta(seconds=1))
+                label = "Minggu ini"
+            else:
+                start, end = month_bounds(period)
+                label = period_label(period)
+
+            rows = db.execute(
+                select(
+                    Transaction.merchant,
+                    func.count(Transaction.id),
+                    func.coalesce(func.sum(Transaction.amount), 0),
+                )
+                .where(
+                    Transaction.deleted_at.is_(None),
+                    Transaction.status == "confirmed",
+                    Transaction.kind == "expense",
+                    Transaction.merchant.in_(mentioned),
+                    Transaction.occurred_at >= start,
+                    Transaction.occurred_at < end,
+                )
+                .group_by(Transaction.merchant)
+                .order_by(func.sum(Transaction.amount).desc())
+            ).all()
+
+            if not rows:
+                return (
+                    f"❌ Belum ada pengeluaran di <b>{', '.join(mentioned)}</b> "
+                    f"untuk {label}"
+                )
+
+            lines = [
+                "━━━━━━━━━━━━━━━━━━━━━━━",
+                "  <b>🏪 Pengeluaran Merchant</b>",
+                "━━━━━━━━━━━━━━━━━━━━━━━",
+                f"📅  {label}",
+                "",
+            ]
+            total = sum(int(row[2] or 0) for row in rows)
+            for merchant, count, amount in rows:
+                lines.append(
+                    f"  • <b>{merchant}</b>: {format_idr(int(amount or 0))} "
+                    f"({count} transaksi)"
+                )
+            lines.append("")
+            lines.append(f"<b>Total:</b> <code>{format_idr(total)}</code>")
+            return "\n".join(lines)
+
+    # Minta bantuan mengatur budget tanpa menyebut nominal.
+    if any(w in question for w in ("atur budget", "setting budget", "kelola budget", "cara budget")):
+        budgets = db.scalars(select(Budget).where(Budget.period == period)).all()
+        lines = [
+            "━━━━━━━━━━━━━━━━━━━━━━━",
+            "  <b>💼 Atur Budget</b>",
+            "━━━━━━━━━━━━━━━━━━━━━━━",
+            "",
+        ]
+        if budgets:
+            lines.append(f"Budget {period_label(period)} saat ini:")
+            for b in budgets:
+                cat = db.get(Category, b.category_id)
+                if cat:
+                    lines.append(f"  • {cat.name}: {format_idr(b.amount)}")
+            lines.append("")
+        lines.append("Ubah dengan format:")
+        lines.append("<code>budget [kategori] [jumlah]</code>")
+        lines.append("Contoh: <code>budget makanan 2jt</code>")
+        return "\n".join(lines)
+
     return None
 
 
@@ -1082,11 +1167,68 @@ def _answer_finance_question(text: str) -> str | None:
         lines.append("└─────────────────────────────")
         return "\n".join(lines)
     
+    # Query spesifik per kategori, mis. "berapa untuk makanan minggu ini".
+    # Cari nama kategori yang disebut user (case-insensitive).
+    with SessionLocal() as db:
+        expense_categories = db.scalars(select(Category).where(Category.kind == "expense")).all()
+    mentioned = [c for c in expense_categories if c.name.lower() in lower]
+
     # Date range queries
     parsed = _question_period(text)
     if not parsed:
-        return None
-    start, end, label = parsed
+        if not mentioned:
+            return None
+        # Tidak ada kata periode, tapi user menyebut kategori: pakai bulan berjalan.
+        period = current_period()
+        start, end = month_bounds(period)
+        label = period_label(period)
+    else:
+        start, end, label = parsed
+
+    if mentioned:
+        from sqlalchemy import func
+
+        category_ids = [c.id for c in mentioned]
+        with SessionLocal() as db:
+            rows = db.execute(
+                select(
+                    Category.name,
+                    func.count(Transaction.id),
+                    func.coalesce(func.sum(Transaction.amount), 0),
+                )
+                .join(Transaction, Transaction.category_id == Category.id)
+                .where(
+                    Transaction.deleted_at.is_(None),
+                    Transaction.status == "confirmed",
+                    Transaction.kind == "expense",
+                    Transaction.occurred_at >= start,
+                    Transaction.occurred_at < end,
+                    Category.id.in_(category_ids),
+                )
+                .group_by(Category.id, Category.name)
+                .order_by(func.sum(Transaction.amount).desc())
+            ).all()
+
+        lines = [
+            "━━━━━━━━━━━━━━━━━━━━━━━",
+            "  <b>📉 Pengeluaran per Kategori</b>",
+            "━━━━━━━━━━━━━━━━━━━━━━━",
+            "",
+            f"<b>Periode:</b> {label}",
+            "",
+        ]
+
+        if not rows:
+            lines.append(f"Belum ada pengeluaran untuk <b>{', '.join(c.name for c in mentioned)}</b>.")
+            return "\n".join(lines)
+
+        total = sum(int(row[2] or 0) for row in rows)
+        for name, count, amount in rows:
+            lines.append(f"• <b>{name}</b>: <code>{format_idr(int(amount or 0))}</code> ({count} transaksi)")
+        lines.append("")
+        lines.append(f"<b>Total:</b> <code>{format_idr(total)}</code>")
+        return "\n".join(lines)
+
     with SessionLocal() as db:
         data = ledger.range_summary(db, start, end)
     
@@ -1590,6 +1732,11 @@ async def handle_text(message: Message) -> None:
         # Ringkasan kondisi keuangan
         if any(word in question for word in ("kondisi keuangan", "ringkas", "keuangan saya", "cashflow")):
             await message.reply(_financial_summary())
+            return
+        
+        # Default: bantu user jika tidak mengerti
+        if any(word in question for word in ("bantu", "help", "tutorial", "cara", "apa")):
+            await message.reply(HELP_TEXT)
             return
     
     # Jika ada nominal DAN bukan pertanyaan budget, masuk ke draft transaksi

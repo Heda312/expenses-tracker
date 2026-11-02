@@ -5,211 +5,343 @@
 <div class="page-head">
   <div>
     <h1>Dashboard</h1>
-    <p class="muted">Ringkasan {{ data.label }}</p>
+    <p class="muted">Ringkasan keuangan {{ period.label|lower }}</p>
   </div>
-  <div class="period-nav">
-    <a class="btn btn-icon" href="/?period={{ prev_period }}" aria-label="Bulan sebelumnya">&lsaquo;</a>
-    <span class="pill">{{ period_label(period) }}</span>
-    <a class="btn btn-icon" href="/?period={{ next_period }}" aria-label="Bulan berikutnya">&rsaquo;</a>
-  </div>
+  <a class="btn btn-ghost btn-sm" href="/transactions?{{ period_query }}">Lihat transaksi</a>
 </div>
+
+{% include "_period_filter.html" %}
 
 <section class="stats">
   <div class="card stat">
-    <span class="stat-label"><i class="dot" style="background: var(--expense)"></i> Pengeluaran</span>
-    <strong class="stat-value num">{{ format_idr(data.expense) }}</strong>
-    <span class="stat-note">{{ data.count }} transaksi</span>
-  </div>
-  <div class="card stat">
     <span class="stat-label"><i class="dot" style="background: var(--income)"></i> Pemasukan</span>
-    <strong class="stat-value num">{{ format_idr(data.income) }}</strong>
-    <span class="stat-note">Bulan ini</span>
+    <strong class="stat-value num">{{ format_idr(summary.income) }}</strong>
+    <span class="stat-note">
+      {% if comparison and comparison.income_change_pct is not none %}
+        <span class="trend {% if comparison.income_change_pct > 0 %}good{% elif comparison.income_change_pct < 0 %}bad{% endif %}">
+          {% if comparison.income_change_pct > 0 %}+{% endif %}{{ comparison.income_change_pct }}%
+        </span>
+        dibanding {{ comparison.label|lower }}
+      {% else %}
+        {{ summary.income_count }} transaksi masuk
+      {% endif %}
+    </span>
   </div>
+
   <div class="card stat">
-    <span class="stat-label">Selisih</span>
-    <strong class="stat-value num {% if data.net < 0 %}neg{% endif %}">{{ format_idr(data.net) }}</strong>
-    <span class="stat-note">Pemasukan &minus; pengeluaran</span>
+    <span class="stat-label"><i class="dot" style="background: var(--expense)"></i> Pengeluaran</span>
+    <strong class="stat-value num">{{ format_idr(summary.expense) }}</strong>
+    <span class="stat-note">
+      {% if comparison and comparison.expense_change_pct is not none %}
+        <span class="trend {% if comparison.expense_change_pct > 0 %}bad{% elif comparison.expense_change_pct < 0 %}good{% endif %}">
+          {% if comparison.expense_change_pct > 0 %}+{% endif %}{{ comparison.expense_change_pct }}%
+        </span>
+        dibanding {{ comparison.label|lower }}
+      {% else %}
+        {{ summary.expense_count }} transaksi keluar
+      {% endif %}
+    </span>
   </div>
+
   <div class="card stat">
-    <span class="stat-label">Total saldo</span>
+    <span class="stat-label"><i class="dot" style="background: var(--accent)"></i> Tabungan periode</span>
+    <strong class="stat-value num {% if summary.net < 0 %}neg{% endif %}">{{ format_idr(summary.net) }}</strong>
+    <span class="stat-note">
+      {% if summary.savings_rate is not none %}
+        Rasio tabungan <strong class="{% if summary.savings_rate < 0 %}amount-expense{% else %}amount-income{% endif %}">{{ summary.savings_rate }}%</strong>
+      {% else %}
+        Belum ada pemasukan
+      {% endif %}
+    </span>
+  </div>
+
+  <div class="card stat">
+    <span class="stat-label"><i class="dot" style="background: var(--accent-2)"></i> Total saldo</span>
     <strong class="stat-value num">{{ format_idr(total_balance) }}</strong>
-    <span class="stat-note">{{ balances | length }} dompet aktif</span>
+    <span class="stat-note">{{ balances|length }} dompet aktif · saldo saat ini</span>
   </div>
 </section>
 
 <div class="dashboard-masonry">
-<section class="dashboard-cards">
-  <div class="card">
-    <div class="card-head"><div><h2 class="card-title">Insight periode</h2><p class="card-sub">Analisis otomatis</p></div></div>
-    <div class="stack">
-      <div class="list-row"><span class="list-title">Rata-rata per hari kalender</span><strong class="num">{{ format_idr(data.daily_average) }}</strong></div>
-      <div class="list-row"><span class="list-title">Rata-rata per hari aktif</span><strong class="num">{{ format_idr(data.active_daily_average) }}</strong></div>
-      <div class="list-row"><span class="list-title">Hari aktif</span><strong>{{ data.active_days }} hari</strong></div>
-      <div class="list-row"><span class="list-title">Perubahan pengeluaran</span>{% if data.expense_change_pct is not none %}<strong class="num {% if data.expense_change_pct > 0 %}amount-expense{% else %}amount-income{% endif %}">{% if data.expense_change_pct > 0 %}Naik{% elif data.expense_change_pct < 0 %}Turun{% else %}Tetap{% endif %} {{ data.expense_change_pct|abs }}%</strong>{% else %}<span class="muted">Belum ada data pembanding</span>{% endif %}</div>
-      <div class="list-row"><span class="list-title">Rasio tabungan</span>{% if data.savings_rate is not none %}<strong class="num {% if data.savings_rate < 0 %}amount-expense{% else %}amount-income{% endif %}">{{ data.savings_rate }}%</strong>{% else %}<span class="muted">Belum ada pemasukan</span>{% endif %}</div>
-      {% if data.top_category %}<div class="list-row"><span class="list-title">Kategori terbesar</span><strong>{{ data.top_category.name }}</strong></div>{% endif %}
-    </div>
-  </div>
-  <div class="card">
-    <div class="card-head"><div><h2 class="card-title">Tempat paling banyak belanja</h2><p class="card-sub">Merchant dengan total pengeluaran terbesar di {{ data.label|lower }}</p></div></div>
-    {% if data.top_merchants %}<div class="list">{% for item in data.top_merchants %}<div class="list-row"><span class="list-title">{{ item.name }}</span><strong class="num">{{ format_idr(item.total) }}</strong></div>{% endfor %}</div>{% else %}<div class="empty">Belum ada data merchant.</div>{% endif %}
-  </div>
-</section>
-
-<section class="dashboard-cards">
-  <div class="card">
-    <div class="card-head"><div><h2 class="card-title">Metrik kebiasaan</h2><p class="card-sub">Pola transaksi {{ data.label }}</p></div></div>
-    <div class="stack">
-      <div class="list-row"><span class="list-title">Hari aktif</span><strong>{{ data.active_days }} hari</strong></div>
-      <div class="list-row"><span class="list-title">Rata-rata per transaksi</span><strong class="num">{{ format_idr(data.average_transaction) }}</strong></div>
-      <div class="list-row"><span class="list-title">Rasio tabungan</span>{% if data.savings_rate is not none %}<strong class="num {% if data.savings_rate < 0 %}amount-expense{% else %}amount-income{% endif %}">{{ data.savings_rate }}%</strong>{% else %}<span class="muted">Belum ada pemasukan</span>{% endif %}</div>
-      {% if data.highest_transaction %}<div class="list-row"><span class="list-title">Transaksi terbesar</span><strong class="num">{{ format_idr(data.highest_transaction.amount) }}</strong></div>{% endif %}
-    </div>
-  </div>
-  <div class="card">
-    <div class="card-head"><div><h2 class="card-title">Dompet yang paling sering dipakai</h2><p class="card-sub">Total uang keluar dari setiap dompet pada {{ data.label|lower }}</p></div></div>
-    {% if data.top_accounts %}<div class="list">{% for item in data.top_accounts %}<div class="list-row"><span class="list-title">{{ item.name }}</span><strong class="num">{{ format_idr(item.total) }}</strong></div>{% endfor %}</div>{% else %}<div class="empty">Belum ada data dompet.</div>{% endif %}
-  </div>
-</section>
-
-<section class="dashboard-cards dashboard-cards-wide">
-  <div class="card">
-    <div class="card-head">
-      <div>
-        <h2 class="card-title">Arus kas 6 bulan</h2>
-        <p class="card-sub">Perbandingan pemasukan dan pengeluaran</p>
+  <section class="dashboard-cards">
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2 class="card-title">Budget</h2>
+          <p class="card-sub">
+            {% if budget.has_budget %}
+              {{ budget.reference_label }} · {{ budget.rows|length }} kategori
+            {% else %}
+              Belum ada budget untuk periode ini
+            {% endif %}
+          </p>
+        </div>
+        <a class="btn btn-ghost btn-sm" href="/budgets?period={{ budget_month_key }}">Atur</a>
       </div>
-      <div class="legend">
-        <span><i class="dot" style="background: var(--income)"></i> Masuk</span>
-        <span><i class="dot" style="background: var(--expense)"></i> Keluar</span>
-      </div>
-    </div>
 
-    {% set peak = cashflow | sum(attribute='expense') + cashflow | sum(attribute='income') %}
-    {% if cashflow_has_data %}
-      <div class="chart">
-        {% for month in cashflow %}
-          <div class="chart-col" title="{{ month.label }} · masuk {{ format_idr(month.income) }} · keluar {{ format_idr(month.expense) }}">
-            <div class="chart-bars">
-              <div class="chart-bar income" style="height: {{ month.income_pct }}%"></div>
-              <div class="chart-bar expense" style="height: {{ month.expense_pct }}%"></div>
-            </div>
-            <span class="chart-label">{{ month.label.split(' ')[0] }}</span>
+      {% if budget.has_budget %}
+        <div class="budget-summary">
+          <div>
+            <span class="hint">Total budget</span>
+            <strong class="num">{{ format_idr(budget.total) }}</strong>
           </div>
-        {% endfor %}
-      </div>
-    {% else %}
-      <div class="empty">
-        <strong>Belum ada data</strong>
-        Kirim foto struk ke bot atau tambah transaksi manual.
-      </div>
-    {% endif %}
-  </div>
+          <div>
+            <span class="hint">Terpakai</span>
+            <strong class="num">{{ format_idr(budget.spent) }}</strong>
+          </div>
+          <div>
+            <span class="hint">Sisa</span>
+            <strong class="num {% if budget.remaining < 0 %}neg{% endif %}">{{ format_idr(budget.remaining) }}</strong>
+          </div>
+        </div>
 
-  <div class="card">
-    <div class="card-head">
-      <div>
-        <h2 class="card-title">Uang keluar berdasarkan kategori</h2>
-        <p class="card-sub">Pembagian total pengeluaran pada {{ data.label|lower }}. Persentase menunjukkan porsi dari seluruh uang keluar.</p>
-      </div>
-    </div>
+        <div class="bar {% if budget.pct and budget.pct > 100 %}over{% endif %}" style="margin: 12px 0 18px">
+          <span style="width: {{ budget.pct if budget.pct and budget.pct < 100 else 100 }}%"></span>
+        </div>
 
-    {% if categories %}
-      <div class="donut-wrap">
-        <svg class="donut" viewBox="0 0 100 100" role="img" aria-label="Komposisi pengeluaran">
-          <circle cx="50" cy="50" r="40" fill="none" stroke="#1b212c" stroke-width="13"/>
-          {% for segment in donut %}
-            <circle cx="50" cy="50" r="40" fill="none"
-                    stroke="{{ segment.color }}" stroke-width="13"
-                    stroke-dasharray="{{ segment.dash }}" stroke-dashoffset="{{ segment.offset }}"
-                    transform="rotate(-90 50 50)"/>
-          {% endfor %}
-        </svg>
-        <div class="donut-legend">
-          {% for item in categories %}
-            <div class="legend-item">
-              <i class="dot" style="background: {{ item.color }}"></i>
-              <span class="legend-name">{{ item.name }}</span>
-              <span class="legend-value num">{{ format_idr(item.total) }}</span>
-              <span class="legend-pct num">{{ item.pct }}%</span>
+        <div class="stack">
+          {% for item in budget.rows %}
+            <div class="budget-row">
+              <div class="budget-head">
+                <span class="legend-name">{{ item.name }}</span>
+                <span class="num muted">{{ format_idr(item.spent) }} / {{ format_idr(item.amount) }}</span>
+              </div>
+              <div class="bar {% if item.over %}over{% endif %}">
+                <span style="width: {{ item.pct if item.pct < 100 else 100 }}%"></span>
+              </div>
+              <div class="budget-foot">
+                <span class="hint">{{ item.pct }}% terpakai</span>
+                <span class="hint {% if item.over %}amount-expense{% endif %}">
+                  {% if item.over %}Lewat {{ format_idr(-item.remaining) }}{% else %}Sisa {{ format_idr(item.remaining) }}{% endif %}
+                </span>
+              </div>
             </div>
           {% endfor %}
         </div>
-      </div>
-    {% else %}
-      <div class="empty">
-        <strong>Belum ada pengeluaran</strong>
-        Kategori akan muncul setelah ada transaksi.
-      </div>
-    {% endif %}
-  </div>
-</section>
-
-<section class="grid-2">
-  <div class="card">
-    <div class="card-head">
-      <div>
-        <h2 class="card-title">Budget</h2>
-        <p class="card-sub">Pemakaian per kategori</p>
-      </div>
-      <a class="btn btn-ghost btn-sm" href="/budgets?period={{ period }}">Atur</a>
+      {% else %}
+        <div class="empty">
+          <strong>Budget belum diatur</strong>
+          Tentukan batas pengeluaran per kategori supaya progress bisa dipantau.
+        </div>
+      {% endif %}
     </div>
 
-    {% if budgets %}
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2 class="card-title">Informasi Keuangan Lainnya</h2>
+          <p class="card-sub">Skor kesehatan dan ringkasan periode</p>
+        </div>
+      </div>
       <div class="stack">
-        {% for item in budgets %}
-          <div class="budget-row">
-            <div class="budget-head">
-              <span class="legend-name">{{ item.name }}</span>
-              <span class="num muted">{{ format_idr(item.spent) }} / {{ format_idr(item.amount) }}</span>
-            </div>
-            <div class="bar {% if item.over %}over{% endif %}">
-              <span style="width: {{ item.pct if item.pct < 100 else 100 }}%"></span>
-            </div>
+        <div class="list-row">
+          <span class="list-title">Skor kesehatan keuangan</span>
+          <div class="list-right">
+            <strong class="num" style="color: var(--{{ health.color }})">{{ health.emoji }} {{ health.score }}/{{ health.grade }}</strong>
           </div>
-        {% endfor %}
+        </div>
+        <div class="list-row">
+          <span class="list-title">Total transaksi</span>
+          <strong class="num">{{ summary.count }} transaksi</strong>
+        </div>
+        <div class="list-row">
+          <span class="list-title">Jumlah kategori</span>
+          <strong class="num">{{ categories|length }} kategori</strong>
+        </div>
+        <div class="list-row">
+          <span class="list-title">Rata-rata transaksi</span>
+          <strong class="num">{{ format_idr(summary.average_transaction) }}</strong>
+        </div>
+        <div class="list-row">
+          <span class="list-title">Hari aktif</span>
+          <strong class="num">{{ summary.active_days }} dari {{ summary.calendar_days }} hari</strong>
+        </div>
       </div>
-    {% else %}
-      <div class="empty">
-        <strong>Belum ada budget</strong>
-        Tentukan batas pengeluaran per kategori.
-      </div>
-    {% endif %}
-  </div>
-
-  <div class="card">
-    <div class="card-head">
-      <div>
-        <h2 class="card-title">Transaksi terakhir</h2>
-        <p class="card-sub">{{ data.label }}</p>
-      </div>
-      <a class="btn btn-ghost btn-sm" href="/transactions?period={{ period }}">Semua</a>
     </div>
 
-    {% if recent %}
-      <div class="list">
-        {% for item in recent %}
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2 class="card-title">Perbandingan periode</h2>
+          <p class="card-sub">{% if comparison %}Dibanding {{ comparison.label|lower }}{% else %}Belum ada periode pembanding{% endif %}</p>
+        </div>
+      </div>
+
+      {% if comparison %}
+        <div class="stack">
           <div class="list-row">
-            <div class="list-main">
-              <span class="list-title">{{ item.merchant or item.note or (item.category.name if item.category else 'Transaksi') }}</span>
-              <span class="list-sub">{{ item.category.name if item.category else 'Tanpa kategori' }} · {{ format_dt(item.occurred_at) }}</span>
-            </div>
+            <span class="list-title">Pemasukan</span>
             <div class="list-right">
-              <span class="num {% if item.kind == 'expense' %}amount-expense{% elif item.kind == 'income' %}amount-income{% endif %}">
-                {% if item.kind == 'expense' %}-{% elif item.kind == 'income' %}+{% endif %}{{ format_idr(item.amount) }}
-              </span>
-              {% if item.status == 'pending' %}<span class="badge badge-pending">Menunggu</span>{% endif %}
+              <strong class="num">{{ format_idr(summary.income) }}</strong>
+              {% if comparison.income_change_pct is not none %}
+                <span class="trend {% if comparison.income_change_pct > 0 %}good{% elif comparison.income_change_pct < 0 %}bad{% endif %}">
+                  {% if comparison.income_change_pct > 0 %}+{% endif %}{{ comparison.income_change_pct }}%
+                </span>
+              {% endif %}
             </div>
           </div>
-        {% endfor %}
+          <div class="list-row">
+            <span class="list-title">Pengeluaran</span>
+            <div class="list-right">
+              <strong class="num">{{ format_idr(summary.expense) }}</strong>
+              {% if comparison.expense_change_pct is not none %}
+                <span class="trend {% if comparison.expense_change_pct > 0 %}bad{% elif comparison.expense_change_pct < 0 %}good{% endif %}">
+                  {% if comparison.expense_change_pct > 0 %}+{% endif %}{{ comparison.expense_change_pct }}%
+                </span>
+              {% endif %}
+            </div>
+          </div>
+          <div class="list-row">
+            <span class="list-title">Selisih</span>
+            <div class="list-right">
+              <strong class="num {% if summary.net < 0 %}neg{% endif %}">{{ format_idr(summary.net) }}</strong>
+              <span class="trend {% if comparison.net_change > 0 %}good{% elif comparison.net_change < 0 %}bad{% endif %}">
+                {% if comparison.net_change > 0 %}+{% endif %}{{ format_idr(comparison.net_change) }}
+              </span>
+            </div>
+          </div>
+        </div>
+        <p class="hint">Periode sebelumnya: masuk {{ format_idr(comparison.income) }}, keluar {{ format_idr(comparison.expense) }}.</p>
+      {% else %}
+        <div class="empty">
+          <strong>Tidak ada pembanding</strong>
+          Pilih periode minggu, bulan, tahun, atau rentang tertentu.
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2 class="card-title">Insight</h2>
+          <p class="card-sub">Analisis otomatis {{ period.label|lower }}</p>
+        </div>
       </div>
-    {% else %}
-      <div class="empty">
-        <strong>Belum ada transaksi</strong>
-        Kirim foto struk ke bot Telegram.
+
+      {% if insights %}
+        <div class="stack insight-list">
+          {% for item in insights %}
+            <div class="insight-item tone-{{ item.tone }}">
+              <span class="insight-icon">{{ item.icon }}</span>
+              <div>
+                <strong class="insight-title">{{ item.title }}</strong>
+                <p class="insight-text">{{ item.text }}</p>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty"><strong>Belum ada insight</strong></div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="dashboard-cards">
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2 class="card-title">Uang keluar per kategori</h2>
+          <p class="card-sub">Porsi dari total pengeluaran {{ period.label|lower }}</p>
+        </div>
       </div>
-    {% endif %}
-  </div>
-</section>
- </div>
+
+      {% if categories %}
+        <div class="donut-wrap">
+          <svg class="donut" viewBox="0 0 100 100" role="img" aria-label="Komposisi pengeluaran">
+            <circle cx="50" cy="50" r="40" fill="none" stroke="#1b212c" stroke-width="13"/>
+            {% for segment in donut %}
+              <circle cx="50" cy="50" r="40" fill="none"
+                      stroke="{{ segment.color }}" stroke-width="13"
+                      stroke-dasharray="{{ segment.dash }}" stroke-dashoffset="{{ segment.offset }}"
+                      transform="rotate(-90 50 50)"/>
+            {% endfor %}
+          </svg>
+          <div class="donut-legend">
+            {% for item in categories %}
+              <div class="legend-item">
+                <i class="dot" style="background: {{ item.color }}"></i>
+                <span class="legend-name">{{ item.name }}</span>
+                <span class="legend-value num">{{ format_idr(item.total) }}</span>
+                <span class="legend-pct num">{{ item.pct }}%</span>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% else %}
+        <div class="empty">
+          <strong>Belum ada pengeluaran</strong>
+          Kategori akan muncul setelah ada transaksi pada periode ini.
+        </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="dashboard-cards-wide">
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2 class="card-title">Arus kas 6 bulan</h2>
+          <p class="card-sub">Perbandingan pemasukan dan pengeluaran</p>
+        </div>
+        <div class="legend">
+          <span><i class="dot" style="background: var(--income)"></i> Masuk</span>
+          <span><i class="dot" style="background: var(--expense)"></i> Keluar</span>
+        </div>
+      </div>
+
+      {% if cashflow_has_data %}
+        <div class="chart">
+          {% for month in cashflow %}
+            <div class="chart-col" title="{{ month.label }} · masuk {{ format_idr(month.income) }} · keluar {{ format_idr(month.expense) }}">
+              <div class="chart-bars">
+                <div class="chart-bar income" style="height: {{ month.income_pct }}%"></div>
+                <div class="chart-bar expense" style="height: {{ month.expense_pct }}%"></div>
+              </div>
+              <span class="chart-label">{{ month.label.split(' ')[0] }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty">
+          <strong>Belum ada data</strong>
+          Kirim foto struk ke bot atau tambah transaksi manual.
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2 class="card-title">Transaksi terakhir</h2>
+          <p class="card-sub">{{ period.label }}</p>
+        </div>
+        <a class="btn btn-ghost btn-sm" href="/transactions?{{ period_query }}">Semua</a>
+      </div>
+
+      {% if recent %}
+        <div class="list">
+          {% for item in recent %}
+            <div class="list-row">
+              <div class="list-main">
+                <span class="list-title">{{ item.merchant or item.note or (item.category.name if item.category else 'Transaksi') }}</span>
+                <span class="list-sub">{{ item.category.name if item.category else 'Tanpa kategori' }} · {{ format_dt(item.occurred_at) }}</span>
+              </div>
+              <div class="list-right">
+                <span class="num {% if item.kind == 'expense' %}amount-expense{% elif item.kind == 'income' %}amount-income{% endif %}">
+                  {% if item.kind == 'expense' %}-{% elif item.kind == 'income' %}+{% endif %}{{ format_idr(item.amount) }}
+                </span>
+                {% if item.status == 'pending' %}<span class="badge badge-pending">Menunggu</span>{% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty">
+          <strong>Belum ada transaksi</strong>
+          Kirim foto struk ke Telegram atau tambah transaksi manual.
+        </div>
+      {% endif %}
+    </div>
+  </section>
+</div>
 {% endblock %}

@@ -1,0 +1,34 @@
+{# Filter periode standar. Konteks: period, period_tabs, prev_url, next_url,
+   custom_start, custom_end, filter_action, extra_params. #}
+<div class="period-bar">
+  <div class="period-tabs" role="tablist" aria-label="Jenis periode">
+    {% for tab in period_tabs %}
+      <a class="period-tab {% if tab.active %}active{% endif %}" href="{{ tab.url }}" role="tab"
+         aria-selected="{{ 'true' if tab.active else 'false' }}">{{ tab.label }}</a>
+    {% endfor %}
+  </div>
+
+  <div class="period-nav">
+    {% if prev_url %}<a class="btn btn-icon" href="{{ prev_url }}" aria-label="Periode sebelumnya">&lsaquo;</a>{% endif %}
+    <span class="pill">{{ period.label }}</span>
+    {% if next_url %}<a class="btn btn-icon" href="{{ next_url }}" aria-label="Periode berikutnya">&rsaquo;</a>{% endif %}
+  </div>
+</div>
+
+{% if period.type == 'custom' %}
+  <form class="period-custom card" method="get" action="{{ filter_action }}">
+    <input type="hidden" name="period_type" value="custom">
+    {% for key, value in extra_params.items() %}
+      <input type="hidden" name="{{ key }}" value="{{ value }}">
+    {% endfor %}
+    <div class="field">
+      <label for="period-start">Dari tanggal</label>
+      <input id="period-start" type="date" name="start" value="{{ custom_start }}" required>
+    </div>
+    <div class="field">
+      <label for="period-end">Sampai tanggal</label>
+      <input id="period-end" type="date" name="end" value="{{ custom_end }}" required>
+    </div>
+    <button class="btn btn-primary" type="submit">Terapkan</button>
+  </form>
+{% endif %}

@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     telegram_bot_token: str = ""
     telegram_allowed_chat_id: str = ""  # Changed to string to avoid validation error
     telegram_webhook_url: str = ""  # Public webhook URL (empty = polling mode)
+
+    # Terapkan migrasi database otomatis saat startup.
+    auto_migrate: bool = True
     
     @property
     def telegram_chat_id(self) -> int | None:

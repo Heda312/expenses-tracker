@@ -221,6 +221,9 @@ def cashflow(db: Session, months: int = 6, end_period: str | None = None) -> lis
     return periods
 
 
+from app.models import category_color
+
+
 def category_totals_range(db: Session, start, end, kind: str = "expense", limit: int = 6) -> list[dict]:
     """Category totals for custom datetime range."""
     rows = db.execute(
@@ -240,7 +243,7 @@ def category_totals_range(db: Session, start, end, kind: str = "expense", limit:
     items = [
         {
             "name": row[0],
-            "color": row[1],
+            "color": row[1] or category_color(row[0]),  # fallback to generated color
             "total": int(row[2] or 0),
             "pct": round(int(row[2] or 0) / total * 100),
         }
@@ -368,12 +371,14 @@ def budget_progress_range(db: Session, start, end) -> list[dict]:
         # Persentase relatif terhadap budget bulan referensi
         pct = round(spent / budget.amount * 100) if budget.amount else 0
         
+        cat = budget.category
+        color = cat.color if cat else None
         result.append(
             {
                 "id": budget.id,
                 "category_id": budget.category_id,
-                "name": budget.category.name if budget.category else "-",
-                "color": budget.category.color if budget.category else "#64748b",
+                "name": cat.name if cat else "-",
+                "color": color or category_color(cat.name) if cat else "#64748b",
                 "amount": budget.amount,
                 "spent": spent,
                 "remaining": budget.amount - spent,

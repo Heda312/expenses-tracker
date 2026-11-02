@@ -5,7 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.models import Category, Transaction, Account
+from app.models import Category, Transaction, Account, category_color
 from app.security import require_user
 from app.templating import templates
 
@@ -55,7 +55,7 @@ def list_categories(
 def create_category(
     name: str = Form(...),
     kind: str = Form("expense"),
-    color: str = Form("#34d399"),
+    color: str = Form(None),
     db: Session = Depends(get_db),
     user=Depends(require_user),
 ):
@@ -70,6 +70,10 @@ def create_category(
     
     # Get max sort_order
     max_order = db.scalar(select(func.max(Category.sort_order))) or 0
+    
+    # Default color: stable random based on name
+    if not color or color == "#34d399":
+        color = category_color(name)
     
     category = Category(
         name=name,

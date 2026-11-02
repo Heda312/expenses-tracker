@@ -1,0 +1,5 @@
+{# Hidden input agar aksi POST kembali ke periode yang sedang dilihat. #}
+<input type="hidden" name="period_type" value="{{ period.type }}">
+<input type="hidden" name="period" value="{{ period.key }}">
+<input type="hidden" name="start" value="{{ period.start_date.isoformat() if period.start_date else '' }}">
+<input type="hidden" name="end" value="{{ period.end_date.isoformat() if period.end_date else '' }}">

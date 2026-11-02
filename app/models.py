@@ -46,6 +46,19 @@ class Account(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
+import hashlib
+
+
+def category_color(name: str) -> str:
+    """Generate stable random color from category name (hex #RRGGBB)."""
+    h = hashlib.md5(name.encode()).hexdigest()
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    # Skip too dark colors
+    if r + g + b < 100:
+        r, g, b = 200, 200, 200
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
 class Category(Base):
     __tablename__ = "categories"
 

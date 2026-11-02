@@ -5,27 +5,17 @@
 <div class="page-head">
   <div>
     <h1>Transaksi</h1>
-    <p class="muted">{{ total }} transaksi ditemukan</p>
+    <p class="muted">{{ total }} transaksi ditemukan · {{ period.label }}</p>
   </div>
   <div class="row-actions">
-    <select id="period-filter" class="period-select" onchange="filterPeriod(this.value)">
-      <option value="">Bulan Ini</option>
-      <option value="all" {% if period == 'all' %}selected{% endif %}>Semua Periode</option>
-      <option value="2026-11" {% if period == '2026-11' %}selected{% endif %}>Nov 2026</option>
-      <option value="2026-10" {% if period == '2026-10' %}selected{% endif %}>Okt 2026</option>
-      <option value="2026-09" {% if period == '2026-09' %}selected{% endif %}>Sep 2026</option>
-      <option value="2026-08" {% if period == '2026-08' %}selected{% endif %}>Agu 2026</option>
-      <option value="2026-07" {% if period == '2026-07' %}selected{% endif %}>Jul 2026</option>
-      <option value="2026-06" {% if period == '2026-06' %}selected{% endif %}>Jun 2026</option>
-    </select>
     <button class="btn btn-primary" type="button" onclick="openPicker()">Tambah</button>
-    {% if period != 'all' %}
+    {% if period.type == 'month' %}
       <details class="export-menu">
         <summary class="btn">Export</summary>
         <div class="export-menu-panel">
-          <strong>Export {{ period }}</strong>
-          <a href="/export.xlsx?period={{ period }}">Excel laporan</a>
-          <a href="/export/umum.csv?period={{ period }}">CSV transaksi</a>
+          <strong>Export {{ period.label }}</strong>
+          <a href="/export.xlsx?period={{ period.key }}">Excel laporan</a>
+          <a href="/export/umum.csv?period={{ period.key }}">CSV transaksi</a>
         </div>
       </details>
     {% endif %}
@@ -128,11 +118,10 @@
   </dialog>
 </div>
 
+{% include "_period_filter.html" %}
+
 <form class="card filters" method="get" action="/transactions">
-  <div class="field">
-    <label for="f-period">Bulan</label>
-    <input id="f-period" type="month" name="period" value="{{ '' if period == 'all' else period }}">
-  </div>
+  {% include "_period_fields.html" %}
   <div class="field">
     <label for="f-account">Dompet</label>
     <select id="f-account" name="account_id">
@@ -155,7 +144,6 @@
     <input id="f-q" name="q" value="{{ q }}" placeholder="merchant atau catatan">
   </div>
   <div class="row-actions">
-    <a class="btn btn-ghost" href="/transactions?period=all">Semua waktu</a>
     <button class="btn" type="submit">Terapkan</button>
   </div>
 </form>
@@ -164,7 +152,7 @@
   {% if rows %}
     <form id="bulk-form" method="post" action="/transactions/bulk-delete"
           onsubmit="return window.confirmBulkDelete ? confirmBulkDelete() : true">
-      <input type="hidden" name="period" value="{{ period }}">
+      {% include "_period_fields.html" %}
       <div class="bulk-bar">
         <span class="muted" id="bulk-count">0 dipilih</span>
         <button class="btn btn-sm btn-danger" type="submit" id="bulk-delete" disabled>Hapus Terpilih</button>
@@ -214,7 +202,7 @@
                 <div class="row-actions end">
                   {% if item.status == 'pending' %}
                     <form method="post" action="/transactions/{{ item.id }}/confirm">
-                      <input type="hidden" name="period" value="{{ period }}">
+                      {% include "_period_fields.html" %}
                       <button class="btn btn-sm btn-primary" type="submit">Simpan</button>
                     </form>
                   {% endif %}
@@ -223,7 +211,7 @@
                           onclick="openTxEdit(this)">Ubah</button>
                   <form method="post" action="/transactions/{{ item.id }}/delete"
                         onsubmit="return requestConfirm(this, 'Hapus transaksi ini?')">
-                    <input type="hidden" name="period" value="{{ period }}">
+                    {% include "_period_fields.html" %}
                     <button class="btn btn-sm btn-ghost btn-danger" type="submit">Hapus</button>
                   </form>
                 </div>
@@ -235,7 +223,7 @@
     </div>
 
     {% if pages > 1 %}
-      {% set query = 'period=' ~ period ~ '&q=' ~ (q | urlencode) ~ '&account_id=' ~ account_id ~ '&category_id=' ~ category_id %}
+      {% set query = pagination_query %}
       <div class="pagination">
         <span>Halaman {{ page }} dari {{ pages }}</span>
         <div class="row-actions">
@@ -323,7 +311,7 @@
         <input id="tx-note" name="note" maxlength="500" placeholder="Opsional">
       </div>
 
-      <input type="hidden" name="period" value="{{ period }}">
+      {% include "_period_fields.html" %}
     </div>
 
     <div class="dialog-foot">

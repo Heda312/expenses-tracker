@@ -6,6 +6,7 @@ bisa ditelusuri kapan dan dari mana.
 
 import asyncio
 import json
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import RedirectResponse
@@ -17,7 +18,8 @@ from app.db import get_db
 from app.models import Account, AuditLog, Category, Transaction, utcnow
 from app.schemas import TransactionInput
 from app.security import check_origin, require_user
-from app.services.dates import current_period, month_bounds, to_local, valid_period
+from app.services.dates import current_period, to_local, valid_period
+from app.services.periods import build_period_context, resolve_period
 from app.services import classify
 from app.templating import templates
 
@@ -54,9 +56,10 @@ def _audit(db: Session, transaction: Transaction, action: str, before: str | Non
     )
 
 
-def _back(period: str, flash: str) -> RedirectResponse:
-    target = period or current_period()
-    return RedirectResponse(f"/transactions?period={target}&flash={flash}", status_code=303)
+def _back(period, flash: str) -> RedirectResponse:
+    params = period.params()
+    params["flash"] = flash
+    return RedirectResponse(f"/transactions?{urlencode(params)}", status_code=303)
 
 
 def _form_json(transaction: Transaction) -> dict:
@@ -76,7 +79,10 @@ def _form_json(transaction: Transaction) -> dict:
 @router.get("/transactions")
 def list_transactions(
     request: Request,
+    period_type: str = Query(""),
     period: str = Query(""),
+    start: str = Query(""),
+    end: str = Query(""),
     account_id: str = Query(""),
     category_id: str = Query(""),
     q: str = Query(""),
@@ -84,16 +90,13 @@ def list_transactions(
     db: Session = Depends(get_db),
     _user=Depends(require_user),
 ):
-    period = period.strip()
-    if period != "all":
-        period = valid_period(period or None)
+    selected = resolve_period(period_type, period, start, end)
 
     conditions = [Transaction.status == "confirmed", Transaction.deleted_at.is_(None)]
 
-    if period != "all":
-        start, end = month_bounds(period)
-        conditions.append(Transaction.occurred_at >= start)
-        conditions.append(Transaction.occurred_at < end)
+    if not selected.is_all:
+        conditions.append(Transaction.occurred_at >= selected.start)
+        conditions.append(Transaction.occurred_at < selected.end)
 
     account_filter = int(account_id) if account_id.isdigit() else None
     if account_filter:
@@ -122,12 +125,22 @@ def list_transactions(
         .limit(PER_PAGE)
     ).all()
 
+    extra_filter = {
+        "account_id": str(account_filter) if account_filter else "",
+        "category_id": str(category_filter) if category_filter else "",
+        "q": keyword,
+    }
+    context = build_period_context(selected, "/transactions", extra_filter)
+
+    pagination_params = dict(selected.params())
+    pagination_params.update({key: value for key, value in extra_filter.items() if value})
+
     return templates.TemplateResponse(
         request,
         "transactions.html",
         {
             "page_name": "transactions",
-            "period": period,
+            **context,
             "account_id": account_id,
             "category_id": category_id,
             "q": keyword,
@@ -136,6 +149,7 @@ def list_transactions(
             "total": total,
             "page": page,
             "pages": pages,
+            "pagination_query": urlencode(pagination_params),
             "accounts": db.scalars(select(Account).order_by(Account.archived, Account.name)).all(),
             "categories": db.scalars(select(Category).order_by(Category.sort_order, Category.name)).all(),
             "default_occurred": to_local(utcnow()).strftime("%Y-%m-%dT%H:%M"),
@@ -181,11 +195,15 @@ def create_transaction(
     merchant: str = Form(""),
     note: str = Form(""),
     occurred_at: str = Form(""),
+    period_type: str = Form(""),
     period: str = Form(""),
+    start: str = Form(""),
+    end: str = Form(""),
     db: Session = Depends(get_db),
     _user=Depends(require_user),
 ):
     check_origin(request)
+    selected = resolve_period(period_type, period, start, end)
 
     try:
         data = TransactionInput(
@@ -199,11 +217,11 @@ def create_transaction(
             occurred_at=occurred_at,
         )
     except (ValidationError, ValueError):
-        return _back(period, "invalid")
+        return _back(selected, "invalid")
 
     if data.kind == "transfer":
         if not data.to_account_id or data.to_account_id == data.account_id:
-            return _back(period, "invalid")
+            return _back(selected, "invalid")
         data.category_id = None
     elif data.category_id is None:
         data.category_id, _ = asyncio.run(classify.classify_category(db, data.merchant, f"{data.merchant or ''} {data.note or ''}", kind=data.kind, use_llm=False))
@@ -227,7 +245,7 @@ def create_transaction(
         if settings.telegram_bot_token and settings.telegram_allowed_chat_id:
             send_alert_if_needed(db, settings.telegram_bot_token, settings.telegram_allowed_chat_id, current_period())
 
-    return _back(period, "saved")
+    return _back(selected, "saved")
 
 
 @router.post("/transactions/{transaction_id}/update")
@@ -242,15 +260,19 @@ def update_transaction(
     merchant: str = Form(""),
     note: str = Form(""),
     occurred_at: str = Form(""),
+    period_type: str = Form(""),
     period: str = Form(""),
+    start: str = Form(""),
+    end: str = Form(""),
     db: Session = Depends(get_db),
     _user=Depends(require_user),
 ):
     check_origin(request)
+    selected = resolve_period(period_type, period, start, end)
 
     transaction = db.get(Transaction, transaction_id)
     if transaction is None or transaction.deleted_at is not None:
-        return _back(period, "notfound")
+        return _back(selected, "notfound")
 
     try:
         data = TransactionInput(
@@ -264,10 +286,10 @@ def update_transaction(
             occurred_at=occurred_at,
         )
     except (ValidationError, ValueError):
-        return _back(period, "invalid")
+        return _back(selected, "invalid")
 
     if data.kind == "transfer" and (not data.to_account_id or data.to_account_id == data.account_id):
-        return _back(period, "invalid")
+        return _back(selected, "invalid")
     if data.kind != "transfer" and data.category_id is None:
         data.category_id, _ = asyncio.run(classify.classify_category(db, data.merchant, f"{data.merchant or ''} {data.note or ''}", kind=data.kind, use_llm=False))
 
@@ -286,24 +308,28 @@ def update_transaction(
     _audit(db, transaction, "update", before)
     db.commit()
 
-    return _back(period, "updated")
+    return _back(selected, "updated")
 
 
 @router.post("/transactions/{transaction_id}/confirm")
 def confirm_transaction(
     transaction_id: int,
     request: Request,
+    period_type: str = Form(""),
     period: str = Form(""),
+    start: str = Form(""),
+    end: str = Form(""),
     db: Session = Depends(get_db),
     _user=Depends(require_user),
 ):
     check_origin(request)
+    selected = resolve_period(period_type, period, start, end)
 
     transaction = db.get(Transaction, transaction_id)
     if transaction is None or transaction.deleted_at is not None:
-        return _back(period, "notfound")
+        return _back(selected, "notfound")
     if transaction.amount <= 0:
-        return _back(period, "invalid")
+        return _back(selected, "invalid")
 
     before = _snapshot(transaction)
     transaction.status = "confirmed"
@@ -318,22 +344,26 @@ def confirm_transaction(
         if settings.telegram_bot_token and settings.telegram_allowed_chat_id:
             send_alert_if_needed(db, settings.telegram_bot_token, settings.telegram_allowed_chat_id, current_period())
 
-    return _back(period, "updated")
+    return _back(selected, "updated")
 
 
 @router.post("/transactions/{transaction_id}/delete")
 def delete_transaction(
     transaction_id: int,
     request: Request,
+    period_type: str = Form(""),
     period: str = Form(""),
+    start: str = Form(""),
+    end: str = Form(""),
     db: Session = Depends(get_db),
     _user=Depends(require_user),
 ):
     check_origin(request)
+    selected = resolve_period(period_type, period, start, end)
 
     transaction = db.get(Transaction, transaction_id)
     if transaction is None or transaction.deleted_at is not None:
-        return _back(period, "notfound")
+        return _back(selected, "notfound")
 
     before = _snapshot(transaction)
     transaction.deleted_at = utcnow()
@@ -348,21 +378,25 @@ def delete_transaction(
         if settings.telegram_bot_token and settings.telegram_allowed_chat_id:
             send_alert_if_needed(db, settings.telegram_bot_token, settings.telegram_allowed_chat_id, current_period())
 
-    return _back(period, "deleted")
+    return _back(selected, "deleted")
 
 
 @router.post("/transactions/bulk-delete")
 def bulk_delete_transactions(
     request: Request,
     tx_ids: list[int] = Form([]),
+    period_type: str = Form(""),
     period: str = Form(""),
+    start: str = Form(""),
+    end: str = Form(""),
     db: Session = Depends(get_db),
     _user=Depends(require_user),
 ):
     check_origin(request)
+    selected = resolve_period(period_type, period, start, end)
 
     if not tx_ids:
-        return _back(period, "no-select")
+        return _back(selected, "no-select")
 
     transactions = db.scalars(
         select(Transaction).where(
@@ -371,7 +405,7 @@ def bulk_delete_transactions(
         )
     ).all()
     if not transactions:
-        return _back(period, "notfound")
+        return _back(selected, "notfound")
 
     # Hapus lunak (soft delete). Saldo dompet otomatis ikut menyesuaikan
     # karena dihitung dari transaksi yang belum dihapus.
@@ -382,4 +416,4 @@ def bulk_delete_transactions(
         _audit(db, transaction, "delete", before)
     db.commit()
 
-    return _back(period, "deleted")
+    return _back(selected, "deleted")
