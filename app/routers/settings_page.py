@@ -50,8 +50,6 @@ def settings_page(
             "transaction_count": total,
             "merchant_count": int(db.scalar(select(func.count(Merchant.id))) or 0),
             "telegram_active": bool(settings.telegram_bot_token),
-            "llm_active": settings.llm_enabled,
-            "llm_model": settings.ollama_model,
             "timezone": settings.timezone,
         },
     )
