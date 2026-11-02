@@ -26,12 +26,4 @@ services:
     profiles:
       - tunnel
 
-  ollama:
-    image: ollama/ollama:latest
-    volumes:
-      - ./ollama-data:/root/.ollama
-    ports:
-      - "127.0.0.1:11434:11434"
-    restart: unless-stopped
-    profiles:
-      - llm
+
