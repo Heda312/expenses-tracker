@@ -9,13 +9,25 @@
   </div>
 </div>
 
+{% if flash == "invalid" %}
+  <div class="alert error">Input tidak valid.</div>
+{% elif flash == "wrong" %}
+  <div class="alert error">Password sekarang salah.</div>
+{% elif flash == "wrong_password" %}
+  <div class="alert error">Password salah.</div>
+{% elif flash == "missing_fields" %}
+  <div class="alert error">Semua field harus diisi.</div>
+{% elif flash == "password_mismatch" %}
+  <div class="alert error">Konfirmasi password tidak sama.</div>
+{% endif %}
+
 <section class="grid-2">
   <div class="stack">
     <div class="card">
       <div class="card-head">
         <div>
           <h2 class="card-title">Akun</h2>
-          <p class="card-sub">{{ user.email }}</p>
+          <p class="card-sub">{{ user.username }}</p>
         </div>
       </div>
 
@@ -30,6 +42,27 @@
           <span class="hint">Minimal 12 karakter. Semua sesi lain akan keluar.</span>
         </div>
         <button class="btn btn-primary" type="submit">Ganti password</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2 class="card-title" style="color: var(--red);">Zona Bahaya</h2>
+          <p class="card-sub">Hapus akun dan semua data</p>
+        </div>
+      </div>
+
+      <form method="post" action="/settings/delete-account" class="form-grid" onsubmit="return confirm('PERINGATAN: Semua data transaksi, budget, dan dompet akan dihapus permanen. Aksi ini tidak bisa dibatalkan.\n\nKetik password untuk konfirmasi.')">
+        <div class="field">
+          <label for="delete-password">Password</label>
+          <input id="delete-password" name="password" type="password" autocomplete="current-password" required>
+        </div>
+        <div class="field">
+          <label for="delete-confirm-password">Ketik ulang password</label>
+          <input id="delete-confirm-password" name="confirm_password" type="password" autocomplete="current-password" required>
+        </div>
+        <button class="btn btn-block" type="submit" style="background: var(--red); color: white;">Hapus Akun Permanen</button>
       </form>
     </div>
 
@@ -121,6 +154,95 @@
         Untuk bulan lain, buka halaman Transaksi, pilih bulan, lalu tekan Export Excel.
       </p>
     </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2 class="card-title">Import CSV</h2>
+          <p class="card-sub">Upload transaksi dari file CSV</p>
+        </div>
+      </div>
+      
+      <form id="importForm" class="form-grid">
+        <div class="field">
+          <label for="csvFile">Pilih file CSV</label>
+          <input type="file" id="csvFile" accept=".csv" required>
+          <span class="hint">Format: tanggal, nominal, kategori, merchant, dompet</span>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="importBtn">Upload & Import</button>
+      </form>
+      
+      <div id="importResult" style="display:none; margin-top: 1rem;"></div>
+      
+      <details style="margin-top: 1rem;">
+        <summary style="cursor: pointer; color: var(--text-secondary); font-size: 0.875rem;">Format CSV</summary>
+        <div style="margin-top: 0.5rem; padding: 0.75rem; background: var(--bg); border-radius: 6px; font-size: 0.875rem;">
+          <p style="margin-bottom: 0.5rem;"><strong>Header (baris pertama):</strong></p>
+          <code>tanggal,nominal,kategori,merchant,dompet</code>
+          
+          <p style="margin: 1rem 0 0.5rem;"><strong>Contoh data:</strong></p>
+          <code>2024-11-01,50000,Makanan,Indomaret,Cash<br>
+          01/11/2024,100000,Transport,Grab,GoPay</code>
+          
+          <p style="margin-top: 1rem; color: var(--text-secondary);">
+            • Kolom wajib: <strong>nominal</strong><br>
+            • Tanggal format: YYYY-MM-DD atau DD/MM/YYYY<br>
+            • Kategori otomatis dibuat jika belum ada
+          </p>
+        </div>
+      </details>
+    </div>
   </div>
 </section>
+
+<script>
+document.getElementById('importForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  
+  const fileInput = document.getElementById('csvFile');
+  const file = fileInput.files[0];
+  if (!file) return;
+  
+  const btn = document.getElementById('importBtn');
+  const result = document.getElementById('importResult');
+  
+  btn.disabled = true;
+  btn.textContent = 'Mengimport...';
+  result.style.display = 'none';
+  
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const res = await fetch('/api/import-csv', {
+      method: 'POST',
+      body: formData
+    });
+    
+    const data = await res.json();
+    
+    if (!res.ok) {
+      throw new Error(data.detail || 'Import gagal');
+    }
+    
+    result.style.display = 'block';
+    result.className = 'alert success';
+    result.innerHTML = `
+      <strong>✅ Import berhasil!</strong><br>
+      ${data.imported} transaksi berhasil diimport
+      ${data.errors > 0 ? `<br><span style="color: var(--orange);">⚠️ ${data.errors} baris error</span>` : ''}
+    `;
+    
+    fileInput.value = '';
+    
+  } catch (err) {
+    result.style.display = 'block';
+    result.className = 'alert error';
+    result.textContent = '❌ ' + err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Upload & Import';
+  }
+});
+</script>
 {% endblock %}

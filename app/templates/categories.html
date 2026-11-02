@@ -1,0 +1,474 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Kategori</h1>
+    <p class="muted">Kelola kategori pengeluaran dan pemasukan</p>
+  </div>
+  <div class="row-actions">
+    <button class="btn btn-primary" onclick="showAddModal()">Tambah Kategori</button>
+  </div>
+</div>
+
+<div class="categories-container">
+  <div class="category-section">
+    <div class="section-header">
+      <h2>📉 Pengeluaran</h2>
+      <span class="badge" id="expense-count">0</span>
+    </div>
+    <div id="expense-categories" class="categories-list"></div>
+  </div>
+  
+  <div class="category-section">
+    <div class="section-header">
+      <h2>📈 Pemasukan</h2>
+      <span class="badge" id="income-count">0</span>
+    </div>
+    <div id="income-categories" class="categories-list"></div>
+  </div>
+</div>
+
+<!-- Modal Tambah -->
+<div id="addModal" class="modal" style="display:none;">
+  <div class="modal-backdrop" onclick="closeModal('addModal')"></div>
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Tambah Kategori</h3>
+      <button class="btn-close" onclick="closeModal('addModal')">&times;</button>
+    </div>
+    <form id="addForm" onsubmit="addCategory(event)">
+      <div class="form-group">
+        <label>Nama Kategori</label>
+        <input type="text" name="name" required placeholder="contoh: Makanan" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label>Jenis</label>
+        <select name="kind" required>
+          <option value="expense">📉 Pengeluaran</option>
+          <option value="income">📈 Pemasukan</option>
+        </select>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('addModal')">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Edit -->
+<div id="editModal" class="modal" style="display:none;">
+  <div class="modal-backdrop" onclick="closeModal('editModal')"></div>
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Edit Kategori</h3>
+      <button class="btn-close" onclick="closeModal('editModal')">&times;</button>
+    </div>
+    <form id="editForm" onsubmit="updateCategory(event)">
+      <input type="hidden" name="id">
+      <div class="form-group">
+        <label>Nama Kategori</label>
+        <input type="text" name="name" required autocomplete="off">
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-danger" onclick="deleteCategory()">Hapus</button>
+        <button type="button" class="btn btn-secondary" onclick="closeModal('editModal')">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<style>
+.categories-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 2rem;
+  max-width: 1200px;
+}
+
+.category-section {
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  border: 1px solid var(--border);
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid var(--border);
+}
+
+.section-header h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.badge {
+  background: var(--primary, #3b82f6);
+  color: white;
+  padding: 0.125rem 0.5rem;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  min-width: 24px;
+  text-align: center;
+}
+
+.categories-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.category-item {
+  display: flex;
+  align-items: center;
+  padding: 0.875rem 1rem;
+  background: var(--bg, #f9fafb);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  border: 1px solid transparent;
+}
+
+.category-item::before {
+  content: "●";
+  color: var(--primary, #3b82f6);
+  font-size: 0.875rem;
+  margin-right: 0.75rem;
+  font-weight: bold;
+}
+
+.category-item:hover {
+  border-color: var(--primary, #3b82f6);
+  background: var(--surface);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.08);
+  transform: translateX(2px);
+}
+
+.category-name {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 0.9375rem;
+  flex: 1;
+}
+
+.category-edit {
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  opacity: 0;
+  transition: opacity 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.category-item:hover .category-edit {
+  opacity: 1;
+}
+
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s;
+}
+
+.modal-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(4px);
+}
+
+.modal-content {
+  position: relative;
+  background: var(--surface);
+  border-radius: 16px;
+  width: 90%;
+  max-width: 480px;
+  padding: 2rem;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  z-index: 1001;
+  animation: slideUp 0.3s;
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.btn-close {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: background 0.2s;
+  line-height: 1;
+  padding: 0;
+}
+
+.btn-close:hover {
+  background: rgba(0,0,0,0.05);
+}
+
+.form-group {
+  margin-bottom: 1.25rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.9375rem;
+  background: var(--bg);
+  color: var(--text-primary);
+  transition: all 0.2s;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  margin-top: 1.5rem;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 2.5rem 1.5rem;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.empty-state::before {
+  content: "📦";
+  display: block;
+  font-size: 2.5rem;
+  margin-bottom: 0.75rem;
+  opacity: 0.3;
+}
+
+.empty-state small {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.8125rem;
+  opacity: 0.7;
+}
+
+@media (max-width: 768px) {
+  .categories-container {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+
+<script>
+let categories = [];
+let editingId = null;
+
+async function loadCategories() {
+  const res = await fetch('/api/categories');
+  const data = await res.json();
+  categories = data.categories;
+  renderCategories();
+}
+
+function renderCategories() {
+  const expenseContainer = document.getElementById('expense-categories');
+  const incomeContainer = document.getElementById('income-categories');
+  const expenseCount = document.getElementById('expense-count');
+  const incomeCount = document.getElementById('income-count');
+  
+  const expenseCategories = categories.filter(c => c.kind === 'expense');
+  const incomeCategories = categories.filter(c => c.kind === 'income');
+  
+  expenseCount.textContent = expenseCategories.length;
+  incomeCount.textContent = incomeCategories.length;
+  
+  expenseContainer.innerHTML = expenseCategories.length 
+    ? expenseCategories.map(c => categoryItem(c)).join('')
+    : '<div class="empty-state">Belum ada kategori pengeluaran<br><small>Klik "Tambah Kategori" untuk membuat</small></div>';
+  
+  incomeContainer.innerHTML = incomeCategories.length
+    ? incomeCategories.map(c => categoryItem(c)).join('')
+    : '<div class="empty-state">Belum ada kategori pemasukan<br><small>Klik "Tambah Kategori" untuk membuat</small></div>';
+}
+
+function categoryItem(category) {
+  return `
+    <div class="category-item" onclick="showEditModal(${category.id})">
+      <div class="category-name">${category.name}</div>
+      <div class="category-edit">Edit →</div>
+    </div>
+  `;
+}
+
+function showAddModal() {
+  document.getElementById('addModal').style.display = 'flex';
+  document.getElementById('addForm').reset();
+}
+
+function showEditModal(id) {
+  const category = categories.find(c => c.id === id);
+  if (!category) return;
+  
+  editingId = id;
+  const form = document.getElementById('editForm');
+  form.id.value = category.id;
+  form.name.value = category.name;
+  
+  document.getElementById('editModal').style.display = 'flex';
+}
+
+function closeModal(modalId) {
+  document.getElementById(modalId).style.display = 'none';
+  editingId = null;
+}
+
+async function addCategory(e) {
+  e.preventDefault();
+  const form = e.target;
+  const formData = new FormData(form);
+  
+  try {
+    const res = await fetch('/api/categories', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: new URLSearchParams(formData)
+    });
+    
+    const data = await res.json();
+    
+    if (!res.ok) {
+      console.error('Error response:', data);
+      alert(data.detail || JSON.stringify(data) || 'Gagal menambah kategori');
+      return;
+    }
+    
+    closeModal('addModal');
+    loadCategories();
+  } catch (err) {
+    console.error('Catch error:', err);
+    alert('Error: ' + err.message);
+  }
+}
+
+async function updateCategory(e) {
+  e.preventDefault();
+  const form = e.target;
+  const formData = new FormData(form);
+  const id = formData.get('id');
+  
+  try {
+    const res = await fetch(`/api/categories/${id}`, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: new URLSearchParams(formData)
+    });
+    
+    if (!res.ok) {
+      const error = await res.json();
+      alert(error.detail || 'Gagal mengubah kategori');
+      return;
+    }
+    
+    closeModal('editModal');
+    loadCategories();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function deleteCategory() {
+  if (!editingId) return;
+  
+  if (!confirm('Yakin hapus kategori ini?')) return;
+  
+  try {
+    const res = await fetch(`/api/categories/${editingId}`, {
+      method: 'DELETE'
+    });
+    
+    if (!res.ok) {
+      const error = await res.json();
+      alert(error.detail || 'Gagal menghapus kategori');
+      return;
+    }
+    
+    closeModal('editModal');
+    loadCategories();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+// Load on page load
+loadCategories();
+</script>
+{% endblock %}

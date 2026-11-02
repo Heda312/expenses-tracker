@@ -58,6 +58,15 @@
         </svg>
         <span>Budget</span>
       </a>
+      <a class="nav-link {% if page_name == 'categories' %}active{% endif %}" href="/categories">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 7h18M3 12h18M3 17h18"/>
+          <circle cx="7" cy="7" r="1"/>
+          <circle cx="7" cy="12" r="1"/>
+          <circle cx="7" cy="17" r="1"/>
+        </svg>
+        <span>Kategori</span>
+      </a>
       <a class="nav-link {% if page_name == 'settings' %}active{% endif %}" href="/settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="2.2"/>
@@ -93,6 +102,155 @@
     <button class="btn btn-danger" type="button" onclick="closeConfirm(true)">Lanjutkan</button>
   </div>
 </dialog>
+
+<!-- Alert Modal Global -->
+<div id="alert-modal" class="modal-overlay" style="display:none;" onclick="closeAlert()">
+  <div class="alert-box" onclick="event.stopPropagation()">
+    <div class="alert-icon" id="alert-icon">ℹ️</div>
+    <div class="alert-content">
+      <h3 id="alert-title">Info</h3>
+      <p id="alert-message"></p>
+    </div>
+    <button class="alert-close" onclick="closeAlert()">×</button>
+  </div>
+</div>
+
+<style>
+/* Background decoration */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: 
+    radial-gradient(circle at 20% 50%, rgba(59, 130, 246, 0.03) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.03) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Alert Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.2s;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.alert-box {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 2rem;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  position: relative;
+  animation: slideUp 0.3s;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.alert-icon {
+  font-size: 3rem;
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.alert-content h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: center;
+}
+
+.alert-content p {
+  margin: 0;
+  color: var(--text-secondary);
+  text-align: center;
+  line-height: 1.5;
+}
+
+.alert-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.alert-close:hover {
+  background: rgba(0,0,0,0.05);
+}
+</style>
+
+<script>
+// Global alert function
+window.showAlert = function(message, type = 'info') {
+  const modal = document.getElementById('alert-modal');
+  const icon = document.getElementById('alert-icon');
+  const title = document.getElementById('alert-title');
+  const msg = document.getElementById('alert-message');
+  
+  const config = {
+    success: { icon: '✅', title: 'Berhasil' },
+    error: { icon: '❌', title: 'Error' },
+    warning: { icon: '⚠️', title: 'Perhatian' },
+    info: { icon: 'ℹ️', title: 'Info' }
+  };
+  
+  const c = config[type] || config.info;
+  icon.textContent = c.icon;
+  title.textContent = c.title;
+  msg.textContent = message;
+  
+  modal.style.display = 'flex';
+};
+
+window.closeAlert = function() {
+  document.getElementById('alert-modal').style.display = 'none';
+};
+
+// Override default alert
+window.alert = function(message) {
+  showAlert(message, 'info');
+};
+</script>
+
 <script src="/static/app.js"></script>
 </body>
 </html>
