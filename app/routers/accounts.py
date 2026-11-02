@@ -105,3 +105,32 @@ def toggle_archive(
 
     flash = "archived" if account.archived else "restored"
     return RedirectResponse(f"/accounts?flash={flash}", status_code=303)
+
+
+@router.post("/accounts/{account_id}/delete")
+def delete_account(
+    account_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    _user=Depends(require_user),
+):
+    check_origin(request)
+
+    account = db.get(Account, account_id)
+    if account is None:
+        return RedirectResponse("/accounts?flash=notfound", status_code=303)
+
+    # Check if account has transactions
+    from app.models import Transaction
+    has_transactions = db.scalar(
+        select(Transaction.id).where(
+            (Transaction.account_id == account_id) | (Transaction.to_account_id == account_id)
+        ).limit(1)
+    )
+    
+    if has_transactions:
+        return RedirectResponse("/accounts?flash=has_transactions", status_code=303)
+    
+    db.delete(account)
+    db.commit()
+    return RedirectResponse("/accounts?flash=deleted", status_code=303)

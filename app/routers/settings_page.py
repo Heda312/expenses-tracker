@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.db import get_db
-from app.models import AuditLog, Budget, Category, Merchant, Transaction, UserSession
+from app.models import Merchant, Transaction, UserSession
 from app.schemas import PasswordInput
 from app.security import (
     COOKIE_NAME,
@@ -88,23 +88,48 @@ def change_password(
 def delete_account(
     request: Request,
     password: str = Form(""),
+    confirm_password: str = Form(""),
     db: Session = Depends(get_db),
     user=Depends(require_user),
 ):
-    """Hapus akun aktif dan seluruh data single-user secara permanen."""
     check_origin(request)
+    
+    if not password or not confirm_password:
+        return RedirectResponse("/settings?flash=missing_fields", status_code=303)
+    
+    if password != confirm_password:
+        return RedirectResponse("/settings?flash=password_mismatch", status_code=303)
+    
     if not verify_password(password, user.password_hash):
-        return RedirectResponse("/settings?flash=wrong", status_code=303)
-
-    db.query(UserSession).delete(synchronize_session=False)
-    db.query(AuditLog).delete(synchronize_session=False)
-    db.query(Transaction).delete(synchronize_session=False)
-    db.query(Budget).delete(synchronize_session=False)
-    db.query(Merchant).delete(synchronize_session=False)
-    db.query(Category).delete(synchronize_session=False)
-    db.delete(user)
-    db.commit()
-
-    response = RedirectResponse("/setup", status_code=303)
+        return RedirectResponse("/settings?flash=wrong_password", status_code=303)
+    
+    # HARD DELETE all data (clean slate for new user)
+    from app.models import Transaction, Budget, Account, Merchant, AuditLog, LoginAttempt
+    from sqlalchemy import text
+    
+    try:
+        # Disable foreign key checks temporarily (SQLite)
+        db.execute(text("PRAGMA foreign_keys = OFF"))
+        
+        # Delete all data in correct order
+        db.execute(text("DELETE FROM audit_logs"))
+        db.execute(text("DELETE FROM budgets"))
+        db.execute(text("DELETE FROM transactions"))
+        db.execute(text("DELETE FROM merchants"))
+        db.execute(text("DELETE FROM accounts"))
+        db.execute(text("DELETE FROM user_sessions"))
+        db.execute(text("DELETE FROM login_attempts"))
+        db.execute(text("DELETE FROM users"))
+        
+        # Re-enable foreign key checks
+        db.execute(text("PRAGMA foreign_keys = ON"))
+        
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(f"Error deleting account: {e}")
+        return RedirectResponse("/settings?flash=error", status_code=303)
+    
+    response = RedirectResponse("/register?flash=deleted", status_code=303)
     response.delete_cookie(COOKIE_NAME, path="/")
     return response

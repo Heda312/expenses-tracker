@@ -16,29 +16,70 @@ def _sum(db: Session, *conditions) -> int:
 
 
 def account_balances(db: Session) -> list[dict]:
-    """Saldo tiap dompet = saldo awal + masuk - keluar - transfer keluar + transfer masuk."""
-    accounts = db.scalars(select(Account).where(Account.archived.is_(False))).all()
+    """Saldo tiap dompet = saldo awal + masuk - keluar - transfer keluar + transfer masuk.
+    Optimized: single query untuk semua akun."""
+    
+    from sqlalchemy import case
+    
+    # Aggregate all transactions per account in one query
+    income_subq = (
+        select(
+            Transaction.account_id,
+            func.coalesce(func.sum(
+                case((Transaction.kind == "income", Transaction.amount), else_=0)
+            ), 0).label("income"),
+            func.coalesce(func.sum(
+                case((Transaction.kind == "expense", Transaction.amount), else_=0)
+            ), 0).label("expense"),
+            func.coalesce(func.sum(
+                case((Transaction.kind == "transfer", Transaction.amount), else_=0)
+            ), 0).label("transfer_out"),
+        )
+        .where(*ACTIVE)
+        .group_by(Transaction.account_id)
+        .subquery()
+    )
+    
+    # Transfer in (to_account_id)
+    transfer_in_subq = (
+        select(
+            Transaction.to_account_id.label("account_id"),
+            func.coalesce(func.sum(Transaction.amount), 0).label("transfer_in")
+        )
+        .where(Transaction.kind == "transfer", *ACTIVE)
+        .group_by(Transaction.to_account_id)
+        .subquery()
+    )
+    
+    # Join with accounts
+    query = (
+        select(
+            Account.id,
+            Account.name,
+            Account.kind,
+            Account.opening_balance,
+            func.coalesce(income_subq.c.income, 0).label("income"),
+            func.coalesce(income_subq.c.expense, 0).label("expense"),
+            func.coalesce(income_subq.c.transfer_out, 0).label("transfer_out"),
+            func.coalesce(transfer_in_subq.c.transfer_in, 0).label("transfer_in"),
+        )
+        .outerjoin(income_subq, Account.id == income_subq.c.account_id)
+        .outerjoin(transfer_in_subq, Account.id == transfer_in_subq.c.account_id)
+        .where(Account.archived.is_(False))
+        .order_by(Account.name)
+    )
+    
     result = []
-
-    for account in accounts:
-        income = _sum(db, Transaction.kind == "income", Transaction.account_id == account.id, *ACTIVE)
-        expense = _sum(db, Transaction.kind == "expense", Transaction.account_id == account.id, *ACTIVE)
-        transfer_out = _sum(db, Transaction.kind == "transfer", Transaction.account_id == account.id, *ACTIVE)
-        transfer_in = _sum(
-            db, Transaction.kind == "transfer", Transaction.to_account_id == account.id, *ACTIVE
-        )
-        balance = account.opening_balance + income - expense - transfer_out + transfer_in
-
-        result.append(
-            {
-                "id": account.id,
-                "name": account.name,
-                "kind": account.kind,
-                "opening_balance": account.opening_balance,
-                "balance": balance,
-            }
-        )
-
+    for row in db.execute(query):
+        balance = row.opening_balance + row.income - row.expense - row.transfer_out + row.transfer_in
+        result.append({
+            "id": row.id,
+            "name": row.name,
+            "kind": row.kind,
+            "opening_balance": row.opening_balance,
+            "balance": balance,
+        })
+    
     return result
 
 
@@ -47,14 +88,25 @@ def total_balance(db: Session) -> int:
 
 
 def summary(db: Session, period: str) -> dict:
+    """Summary periode dengan single query untuk income & expense."""
     start, end = month_bounds(period)
     in_month = (Transaction.occurred_at >= start, Transaction.occurred_at < end)
-
-    income = _sum(db, Transaction.kind == "income", *in_month, *ACTIVE)
-    expense = _sum(db, Transaction.kind == "expense", *in_month, *ACTIVE)
-    count = db.scalar(
-        select(func.count(Transaction.id)).where(*in_month, *ACTIVE, Transaction.kind != "transfer")
-    )
+    
+    from sqlalchemy import case
+    
+    # Single query untuk income, expense, dan count
+    result = db.execute(
+        select(
+            func.coalesce(func.sum(case((Transaction.kind == "income", Transaction.amount), else_=0)), 0).label("income"),
+            func.coalesce(func.sum(case((Transaction.kind == "expense", Transaction.amount), else_=0)), 0).label("expense"),
+            func.count(Transaction.id).label("count")
+        )
+        .where(*in_month, *ACTIVE, Transaction.kind != "transfer")
+    ).first()
+    
+    income = result.income if result else 0
+    expense = result.expense if result else 0
+    count = result.count if result else 0
 
     return {
         "period": period,
@@ -62,7 +114,7 @@ def summary(db: Session, period: str) -> dict:
         "income": income,
         "expense": expense,
         "net": income - expense,
-        "count": int(count or 0),
+        "count": int(count),
     }
 
 
@@ -169,8 +221,8 @@ def cashflow(db: Session, months: int = 6, end_period: str | None = None) -> lis
     return periods
 
 
-def category_totals(db: Session, period: str, kind: str = "expense", limit: int = 6) -> list[dict]:
-    start, end = month_bounds(period)
+def category_totals_range(db: Session, start, end, kind: str = "expense", limit: int = 6) -> list[dict]:
+    """Category totals for custom datetime range."""
     rows = db.execute(
         select(Category.name, Category.color, func.sum(Transaction.amount))
         .join(Transaction, Transaction.category_id == Category.id)
@@ -211,15 +263,99 @@ def category_totals(db: Session, period: str, kind: str = "expense", limit: int 
     return items
 
 
-def budget_progress(db: Session, period: str) -> list[dict]:
-    """Budget bulan ini beserta pemakaiannya per kategori."""
+def category_totals(db: Session, period: str, kind: str = "expense", limit: int = 6) -> list[dict]:
     start, end = month_bounds(period)
+    return category_totals_range(db, start, end, kind, limit)
+
+
+def budget_progress(db: Session, period: str) -> list[dict]:
+    """Budget bulan ini beserta pemakaiannya per kategori.
+    Optimized: single query dengan LEFT JOIN."""
+    start, end = month_bounds(period)
+    
+    # Subquery untuk spending per kategori
+    spent_subq = (
+        select(
+            Transaction.category_id,
+            func.coalesce(func.sum(Transaction.amount), 0).label("spent")
+        )
+        .where(
+            Transaction.kind == "expense",
+            Transaction.occurred_at >= start,
+            Transaction.occurred_at < end,
+            *ACTIVE
+        )
+        .group_by(Transaction.category_id)
+        .subquery()
+    )
+    
+    # Join budget dengan category dan spending
+    query = (
+        select(
+            Budget.id,
+            Budget.category_id,
+            Budget.amount,
+            Category.name,
+            Category.color,
+            func.coalesce(spent_subq.c.spent, 0).label("spent")
+        )
+        .join(Category, Budget.category_id == Category.id)
+        .outerjoin(spent_subq, Budget.category_id == spent_subq.c.category_id)
+        .where(Budget.period == period)
+        .order_by(Budget.amount.desc())
+    )
+    
+    result = []
+    for row in db.execute(query):
+        pct = round(row.spent / row.amount * 100) if row.amount else 0
+        result.append({
+            "id": row.id,
+            "category_id": row.category_id,
+            "name": row.name or "-",
+            "color": row.color or "#64748b",
+            "amount": row.amount,
+            "spent": row.spent,
+            "remaining": row.amount - row.spent,
+            "pct": pct,
+            "over": row.spent > row.amount,
+        })
+
+    return result
+
+
+def budget_progress_range(db: Session, start, end) -> list[dict]:
+    """Budget progress untuk custom datetime range.
+    
+    Logic:
+    - Jika filter <= 1 bulan: tampilkan budget bulan tersebut vs spent di periode filter
+    - Jika filter > 1 bulan atau cross-month: hanya tampilkan budget bulan berjalan vs spent di periode filter
+    - Spent selalu sesuai range yang dipilih, tapi budget tetap per bulan (tidak diakumulasi)
+    """
+    # Tentukan bulan mana yang jadi referensi budget
+    # Prioritas: bulan dari start date, atau bulan saat ini jika start terlalu jauh
+    start_period = start.strftime("%Y-%m")
+    current_period = now_local().strftime("%Y-%m")
+    
+    # Hitung durasi range
+    days_range = (end - start).days
+    
+    # Jika range <= 31 hari dan dalam 1 bulan yang sama, pakai budget bulan tersebut
+    if days_range <= 31 and start.strftime("%Y-%m") == end.strftime("%Y-%m"):
+        reference_period = start_period
+    else:
+        # Jika range lebih dari 1 bulan atau cross-month, pakai budget bulan berjalan
+        reference_period = current_period
+    
+    # Ambil budget dari periode referensi
     budgets = db.scalars(
-        select(Budget).where(Budget.period == period).order_by(Budget.amount.desc())
+        select(Budget)
+        .where(Budget.period == reference_period)
+        .order_by(Budget.amount.desc())
     ).all()
 
     result = []
     for budget in budgets:
+        # Spent dihitung sesuai range yang dipilih user
         spent = _sum(
             db,
             Transaction.kind == "expense",
@@ -228,7 +364,10 @@ def budget_progress(db: Session, period: str) -> list[dict]:
             Transaction.occurred_at < end,
             *ACTIVE,
         )
+        
+        # Persentase relatif terhadap budget bulan referensi
         pct = round(spent / budget.amount * 100) if budget.amount else 0
+        
         result.append(
             {
                 "id": budget.id,
@@ -240,10 +379,11 @@ def budget_progress(db: Session, period: str) -> list[dict]:
                 "remaining": budget.amount - spent,
                 "pct": pct,
                 "over": spent > budget.amount,
+                "reference_period": reference_period,  # Info periode budget yang dipakai
             }
         )
-
-    return result
+    
+    return sorted(result, key=lambda x: x["spent"], reverse=True)
 
 
 def donut_segments(items: list[dict], radius: int = 40) -> list[dict]:

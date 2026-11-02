@@ -8,6 +8,16 @@
     <p class="muted">{{ total }} transaksi ditemukan</p>
   </div>
   <div class="row-actions">
+    <select id="period-filter" class="period-select" onchange="filterPeriod(this.value)">
+      <option value="">Bulan Ini</option>
+      <option value="all" {% if period == 'all' %}selected{% endif %}>Semua Periode</option>
+      <option value="2026-11" {% if period == '2026-11' %}selected{% endif %}>Nov 2026</option>
+      <option value="2026-10" {% if period == '2026-10' %}selected{% endif %}>Okt 2026</option>
+      <option value="2026-09" {% if period == '2026-09' %}selected{% endif %}>Sep 2026</option>
+      <option value="2026-08" {% if period == '2026-08' %}selected{% endif %}>Agu 2026</option>
+      <option value="2026-07" {% if period == '2026-07' %}selected{% endif %}>Jul 2026</option>
+      <option value="2026-06" {% if period == '2026-06' %}selected{% endif %}>Jun 2026</option>
+    </select>
     <button class="btn btn-primary" type="button" onclick="openPicker()">Tambah</button>
     {% if period != 'all' %}
       <details class="export-menu">
@@ -185,11 +195,14 @@
                 {% if item.status == 'pending' %}<span class="badge badge-pending">Menunggu</span>{% endif %}
               </td>
               <td>
-                <div class="cell-title">{{ item.merchant or item.note or '-' }}</div>
+                <div class="cell-title">{{ item.merchant or '-' }}</div>
                 <div class="cell-sub">
                   {{ item.category.name if item.category else 'Tanpa kategori' }}
                   {% if item.kind == 'transfer' and item.to_account %}
                     &middot; transfer ke {{ item.to_account.name }}
+                  {% endif %}
+                  {% if item.note %}
+                    <br><span style="color: var(--muted); font-size: 0.9em;">💬 {{ item.note }}</span>
                   {% endif %}
                 </div>
               </td>
@@ -319,4 +332,35 @@
     </div>
   </form>
 </dialog>
+
+<style>
+.period-select {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.period-select:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+</style>
+
+<script>
+function filterPeriod(period) {
+  const url = new URL(window.location);
+  if (period) {
+    url.searchParams.set('period', period);
+  } else {
+    url.searchParams.delete('period');
+  }
+  url.searchParams.delete('page');
+  window.location = url.toString();
+}
+</script>
 {% endblock %}

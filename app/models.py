@@ -124,6 +124,8 @@ class Budget(Base):
     category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"))
     period: Mapped[str] = mapped_column(String(7))  # format YYYY-MM
     amount: Mapped[int] = mapped_column(Integer)
+    alert_70_sent: Mapped[bool] = mapped_column(Boolean, default=False)
+    alert_90_sent: Mapped[bool] = mapped_column(Boolean, default=False)
 
     category: Mapped["Category"] = relationship()
 
@@ -134,7 +136,7 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    username: Mapped[str] = mapped_column(String(80), unique=True)
+    username: Mapped[str] = mapped_column(String(190), unique=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 

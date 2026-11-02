@@ -88,7 +88,7 @@ def list_transactions(
     if period != "all":
         period = valid_period(period or None)
 
-    conditions = [Transaction.deleted_at.is_(None)]
+    conditions = [Transaction.status == "confirmed", Transaction.deleted_at.is_(None)]
 
     if period != "all":
         start, end = month_bounds(period)
@@ -218,6 +218,14 @@ def create_transaction(
     db.flush()
     _audit(db, transaction, "create", None)
     db.commit()
+    db.refresh(transaction)
+    
+    # Check budget alerts for expense (sync version for web)
+    if transaction.kind == "expense" and transaction.category_id:
+        from app.services.budget_alerts import send_alert_if_needed
+        from app.config import settings
+        if settings.telegram_bot_token and settings.telegram_allowed_chat_id:
+            send_alert_if_needed(db, settings.telegram_bot_token, settings.telegram_allowed_chat_id, current_period())
 
     return _back(period, "saved")
 
@@ -301,6 +309,14 @@ def confirm_transaction(
     transaction.status = "confirmed"
     _audit(db, transaction, "update", before)
     db.commit()
+    
+    # Check budget alerts after edit (if expense category changed or amount changed)
+    if transaction.kind == "expense" and transaction.category_id:
+        from app.services.budget_alerts import send_alert_if_needed
+        from app.services.dates import current_period
+        from app.config import settings
+        if settings.telegram_bot_token and settings.telegram_allowed_chat_id:
+            send_alert_if_needed(db, settings.telegram_bot_token, settings.telegram_allowed_chat_id, current_period())
 
     return _back(period, "updated")
 
@@ -323,6 +339,14 @@ def delete_transaction(
     transaction.deleted_at = utcnow()
     _audit(db, transaction, "delete", before)
     db.commit()
+    
+    # Check budget alerts after delete (if was expense)
+    if transaction.kind == "expense" and transaction.category_id:
+        from app.services.budget_alerts import send_alert_if_needed
+        from app.services.dates import current_period
+        from app.config import settings
+        if settings.telegram_bot_token and settings.telegram_allowed_chat_id:
+            send_alert_if_needed(db, settings.telegram_bot_token, settings.telegram_allowed_chat_id, current_period())
 
     return _back(period, "deleted")
 
