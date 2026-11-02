@@ -5,7 +5,7 @@
 <div class="page-head">
   <div>
     <h1>Pengaturan</h1>
-    <p class="muted">Akun, integrasi, dan data</p>
+    <p class="muted">Akun dan integrasi</p>
   </div>
 </div>
 
@@ -45,24 +45,23 @@
       </form>
     </div>
 
-    <div class="card">
+    <div class="card danger-card">
       <div class="card-head">
         <div>
-          <h2 class="card-title" style="color: var(--red);">Zona Bahaya</h2>
-          <p class="card-sub">Hapus akun dan semua data</p>
+          <h2 class="card-title">Hapus Akun</h2>
+          <p class="card-sub">Peringatan zona bahaya</p>
         </div>
       </div>
 
-      <form method="post" action="/settings/delete-account" class="form-grid" onsubmit="return confirm('PERINGATAN: Semua data transaksi, budget, dan dompet akan dihapus permanen. Aksi ini tidak bisa dibatalkan.\n\nKetik password untuk konfirmasi.')">
+      <form method="post" action="/settings/delete-account" class="form-grid">
         <div class="field">
-          <label for="delete-password">Password</label>
+          <label for="delete-password">Password (konfirmasi)</label>
           <input id="delete-password" name="password" type="password" autocomplete="current-password" required>
         </div>
-        <div class="field">
-          <label for="delete-confirm-password">Ketik ulang password</label>
-          <input id="delete-confirm-password" name="confirm_password" type="password" autocomplete="current-password" required>
-        </div>
-        <button class="btn btn-block" type="submit" style="background: var(--red); color: white;">Hapus Akun Permanen</button>
+        <p class="hint" style="color: var(--danger); margin-bottom: 16px;">
+          Semua data transaksi, dompet, budget, dan akun akan dihapus permanen. Aksi tidak bisa dibatalkan.
+        </p>
+        <button class="btn btn-danger btn-block" type="submit">Hapus Akun Permanen</button>
       </form>
     </div>
 
@@ -70,7 +69,7 @@
       <div class="card-head">
         <div>
           <h2 class="card-title">Integrasi</h2>
-          <p class="card-sub">Status layanan yang terhubung</p>
+          <p class="card-sub">Status layanan terhubung</p>
         </div>
       </div>
 
@@ -79,12 +78,6 @@
           <span>Bot Telegram</span>
           <span class="badge {% if telegram_active %}badge-ok{% else %}badge-off{% endif %}">
             {{ 'Aktif' if telegram_active else 'Belum diatur' }}
-          </span>
-        </div>
-        <div class="info-row">
-          <span>LLM lokal (kategori)</span>
-          <span class="badge {% if llm_active %}badge-ok{% else %}badge-off{% endif %}">
-            {{ llm_model if llm_active else 'Nonaktif' }}
           </span>
         </div>
         <div class="info-row">
@@ -98,21 +91,7 @@
       </div>
     </div>
 
-    <div class="card danger-card">
-      <div class="card-head">
-        <div>
-          <h2 class="card-title">Hapus akun</h2>
-          <p class="card-sub">Hapus akun dan seluruh data secara permanen.</p>
-        </div>
-      </div>
-      <form method="post" action="/settings/delete-account" class="form-grid" onsubmit="return requestConfirm(this, 'Akun, transaksi, dompet, budget, dan seluruh data akan dihapus permanen. Lanjutkan?')">
-        <div class="field">
-          <label for="delete-account-password">Password untuk konfirmasi</label>
-          <input id="delete-account-password" name="password" type="password" autocomplete="current-password" required>
-        </div>
-        <button class="btn btn-danger" type="submit">Hapus akun permanen</button>
-      </form>
-    </div>
+
   </div>
 
   <div class="stack">
@@ -128,7 +107,7 @@
         'merchant': 'Ingatan merchant',
         'fuzzy': 'Mirip merchant',
         'rule': 'Aturan keyword',
-        'llm': 'LLM lokal',
+
         'none': 'Tidak terdeteksi',
         'manual': 'Diisi manual'
       } %}
@@ -148,7 +127,7 @@
           {% endfor %}
         </div>
         <p class="hint">
-          Semakin besar porsi "Ingatan merchant", semakin jarang LLM dipanggil.
+
         </p>
       {% else %}
         <div class="empty">

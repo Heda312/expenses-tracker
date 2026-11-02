@@ -4,11 +4,12 @@ Urutan:
   1. ingatan merchant (cocok persis)   -> 0 ms
   2. aturan keyword                    -> 0 ms
   3. ingatan merchant (mirip/fuzzy)    -> 1 ms
-  4. LLM lokal (kalau diaktifkan)      -> 0.3-0.8 s
-  5. "Lainnya"
+  4. "Lainnya"
 
 Semakin sering dipakai, lapis 1 dan 3 semakin banyak terisi sehingga
 LLM makin jarang dipanggil.
+
+Deprecated: LLM removed. OCR/parser only.
 """
 
 import re
@@ -18,7 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models import Category
-from app.services import llm
+
 from app.services.merchant import find_exact, find_fuzzy
 
 # (pola, nama kategori). Urutan menentukan prioritas.
@@ -87,16 +88,7 @@ async def classify_category(
         similar.hits += 1
         return similar.category_id, "fuzzy"
 
-    # 4. LLM lokal - skip by default buat speed
-    if use_llm and settings.llm_enabled and merchant_raw and len(merchant_raw.strip()) > 2:
-        try:
-            chosen = await llm.classify_merchant(merchant_raw, list(categories.keys()))
-            if chosen and chosen in categories:
-                return categories[chosen].id, "llm"
-        except Exception:
-            pass
-
-    # 5. Tidak ada yang cocok
+    # 4. Tidak ada yang cocok
     fallback_name = "Lainnya" if kind == "expense" else "Pemasukan Lain"
     fallback = categories.get(fallback_name)
     return (fallback.id if fallback else None), "none"

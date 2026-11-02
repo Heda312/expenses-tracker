@@ -53,9 +53,17 @@
             {% if account.archived %}Aktifkan kembali{% else %}Arsipkan{% endif %}
           </button>
         </form>
+
+        <form method="post" action="/accounts/{{ account.id }}/delete" class="inline-form">
+          <button class="btn btn-sm btn-ghost btn-danger" type="submit">
+            Hapus
+          </button>
+        </form>
       </div>
     {% endfor %}
   </div>
+
+
 
   <div class="card">
     <div class="card-head">
