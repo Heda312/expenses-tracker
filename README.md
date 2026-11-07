@@ -1,427 +1,586 @@
 # Catat
 
-Expense Tracker Sederhana dengan Telegram Bot & Web Dashboard
+**Pencatat keuangan pribadi** dengan web dashboard, Telegram bot, dan REST API untuk agent eksternal.
+
+Input transaksi lewat chat, foto struk (OCR), atau web. Saldo dompet dihitung otomatis dari transaksi. Semua data tersimpan lokal di SQLite.
+
+**Versi:** 1.2.0 &nbsp;·&nbsp; **Lisensi:** MIT &nbsp;·&nbsp; **Python:** 3.11+
 
 ---
 
-## 📋 Konten
+## Daftar Isi
 
-- [Tentang](#-tentang)
-- [Fitur](#-fitur)
-- [Quick Start](#-quick-start)
-- [Telegram Bot](#-telegram-bot)
-- [Web Dashboard](#-web-dashboard)
-- [Installasi Docker](#-installasi-docker)
-- [Konfigurasi](#-konfigurasi)
-- [Struktur Project](#-struktur-project)
-- [Tech Stack](#-tech-stack)
-- [Backup & Restore](#-backup--restore)
-- [Troubleshooting](#-troubleshooting)
-- [Contributing](#-contributing)
-- [License](#-license)
-
----
-
-## 🎯 Tentang
-
-Catat adalah aplikasi tracking keuangan pribadi yang fokus pada kemudahan penggunaan.
-
-- **Input cepat** via Telegram bot dengan natural language
-- **Visualisasi jelas** via web dashboard
-- **Self-contained** menggunakan SQLite
-- **No LLM** — OCR + parsing sederhana untuk kecepatan maksimal
-
-Versi 1.1.0 (current) — Grid layout UI, response format improved, CRUD transaksi via bot.
+- [Fitur](#fitur)
+- [Tech Stack](#tech-stack)
+- [Instalasi Windows](#instalasi-windows)
+- [Instalasi Linux (Docker)](#instalasi-linux-docker)
+- [Konfigurasi](#konfigurasi)
+- [Menjalankan Aplikasi](#menjalankan-aplikasi)
+- [Telegram Bot](#telegram-bot)
+- [API untuk Hermes](#api-untuk-hermes)
+- [Import & Export CSV](#import--export-csv)
+- [Struktur Project](#struktur-project)
+- [Testing](#testing)
+- [Backup & Restore](#backup--restore)
+- [Troubleshooting](#troubleshooting)
+- [Changelog](#changelog)
 
 ---
 
-## ✨ Fitur
-
-### Telegram Bot
-
-| Fitur | Keterangan |
-|-------|------------|
-| 📸 OCR Struk | Upload foto, ekstrak nominal otomatis |
-| 💬 Natural Language | Input transaksi: `makan 35rb`, `gaji 8jt` |
-| 📁 CRUD Kategori | Tambah, ubah, hapus kategori via chat |
-| 💼 Budget Tracking | Set budget per kategori dengan alert |
-| 📊 Query Info | Tanya saldo, budget, transaksi |
-| 📥 Import CSV | Bulk import via bot |
+## Fitur
 
 ### Web Dashboard
 
 | Fitur | Keterangan |
 |-------|------------|
-| 📈 Dashboard | Ringkasan saldo, cashflow, budget |
-| 💰 Transaksi CRUD | Tambah, edit, delete transaksi |
-| 📁 Kategori Custom | Kelola kategori tanpa default |
-| 👛 Multi-Wallet | Cash, bank, e-wallet |
-| 📥 Import/Export | CSV & Excel import/export |
-| 🔍 Filter Periode | Bulan ini, bulan lalu, custom range |
-| 🎨 Dark Mode | Theme gelap by default |
+| Dashboard | Ringkasan saldo, cashflow, budget, insight otomatis |
+| Transaksi | CRUD lengkap, filter periode (minggu/bulan/tahun/rentang/semua) |
+| Multi-dompet | Tunai, bank, e-wallet dengan **saldo dinamis** |
+| Kategori | CRUD dengan warna otomatis |
+| Budget | Progress per kategori dengan alert 70%/90%/100% |
+| OCR Struk | Upload foto struk, nominal terisi otomatis |
+| Import/Export | CSV transaksi (round-trip) dan Excel |
+
+### Telegram Bot
+
+| Fitur | Contoh |
+|-------|--------|
+| Input natural language | `makan 35rb`, `gaji 8jt` |
+| OCR struk | Kirim foto → draft → konfirmasi |
+| CRUD kategori | `tambah kategori Snack`, `hapus kategori Transport` |
+| Budget tracking | `budget makanan 2jt`, `sisa budget` |
+| Query info | `saldo`, `pengeluaran bulan ini`, `merchant terbanyak` |
+| Import CSV | Kirim file `.csv` ke bot |
+
+### REST API (untuk agent)
+
+| Fitur | Keterangan |
+|-------|------------|
+| Auth Bearer token | `Authorization: Bearer <HERMES_API_TOKEN>` |
+| CRUD transaksi/dompet/kategori | JSON, auto-create dompet & kategori |
+| Import CSV | Multipart atau JSON string |
+| Dokumentasi | `docs/API_HERMES.md` + Swagger di `/docs` |
+
+### Keunggulan desain
+
+- **Saldo dompet dinamis** — tidak pernah dipatok; selalu dihitung dari transaksi
+  (`saldo_awal + masuk − keluar − transfer_keluar + transfer_masuk`).
+- **Dompet & kategori otomatis** — terbentuk dari transaksi saat import, tanpa
+  perlu setup manual.
+- **Jenis dompet terbawa** — tunai/bank/e-wallet tersimpan di kolom
+  `Jenis Dompet` dan ditebak dari nama jika kosong.
+- **No LLM** — parsing deterministik, cepat, tanpa biaya API.
 
 ---
 
-## 🚀 Quick Start
+## Tech Stack
+
+| Komponen | Teknologi |
+|----------|-----------|
+| Web | FastAPI + Jinja2 + Uvicorn |
+| Database | SQLite + SQLAlchemy 2.x + Alembic |
+| Bot | aiogram 3.x |
+| OCR | RapidOCR (ONNX) + EasyOCR (fallback) |
+| Parsing | rapidfuzz + regex |
+| Keamanan | Argon2id + session cookie |
+| Export | openpyxl (Excel), csv |
+
+---
+
+## Instalasi Windows
 
 ### Prasyarat
 
-- Python 3.12+
-- Docker & Docker Compose (rekomendasi)
-- Token bot Telegram dari @BotFather
+- **Python 3.11+** — [python.org](https://www.python.org/downloads/)
+  (centang **"Add python.exe to PATH"** saat instalasi)
+- **Git** — [git-scm.com](https://git-scm.com/download/win)
+- **Visual C++ Redistributable** — wajib untuk RapidOCR/ONNX
+  ([unduh x64](https://aka.ms/vs/17/release/vc_redist.x64.exe))
 
-### Installasi Cepat (Docker)
+### Langkah
 
-```bash
+```powershell
+# 1. Clone repo
 git clone https://github.com/Heda312/expenses-tracker.git
 cd expenses-tracker
 
-cp .env.example .env
-mkdir -p data/uploads
+# 2. Buat virtual environment
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
 
-docker compose build
-docker compose up -d
+# Jika muncul error execution policy:
+# Set-ExecutionPolicy -Scope Process Bypass
+
+# 3. Install dependency
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+
+# 4. Siapkan konfigurasi
+Copy-Item .env.example .env
+notepad .env          # isi SECRET_KEY & token bot
+
+# 5. Jalankan
+python -m uvicorn app.main:app --reload
 ```
 
-Akses: http://localhost:8000
+Buka **http://127.0.0.1:8000** → daftar akun → mulai catat.
+
+### Menggunakan VSCode
+
+1. **File → Open Folder** → pilih folder project
+2. `Ctrl+Shift+P` → **Python: Select Interpreter** → pilih `.venv\Scripts\python.exe`
+3. **Terminal → New Terminal**, lalu:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python -m uvicorn app.main:app --reload
+```
+
+### Catatan Windows
+
+- OCR butuh **Visual C++ Redistributable**; tanpa itu RapidOCR gagal dimuat
+  (aplikasi tetap jalan, OCR akan fallback ke EasyOCR).
+- Kalau aktivasi venv diblokir, jalankan sekali:
+  `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
+- Port 8000 dipakai proses lain? Ganti: `--port 8080`
 
 ---
 
-## 📱 Telegram Bot
+## Instalasi Linux (Docker)
 
-### Setup Bot
+Cara paling praktis untuk server/NAS/VPS. Docker menangani semua dependency
+sistem OCR (libGL, libgomp, dll).
 
-1. Buat bot via `@BotFather` → dapatkan token
-2. Dapatkan `chat_id` via `@userinfobot`
-3. Tambahkan ke `.env`:
+### Prasyarat
 
-```
-TELEGRAM_BOT_TOKEN=your_bot_token_here
-TELEGRAM_ALLOWED_CHAT_ID=your_chat_id_here
-```
-
-### Perintah & Input
-
-#### Input Transaksi (Natural Language)
-
-```
-makan siang 35rb warteg
-parkir 5rb pake gopay
-gaji 8jt masuk bca
-bonus 500k pake bca
-```
-
-Format: `[merchant/keterangan] [nominal] [dompet]`
-
-#### CRUD Kategori
-
-```
-tambah kategori Olahraga
-tambah kategori Bonus pemasukan
-hapus kategori Lain-lain
-ubah kategori Makan jadi Makanan
-/kategori
-```
-
-#### Budget
-
-```
-budget makanan 2jt
-budget transport 500rb
-budget bonus 1jt pemasukan
-/budget
-```
-
-#### Query Info
-
-```
-berapa sisa saldo
-berapa kategori
-kategori apa saja
-berapa transaksi bulan ini
-budget apa saja
-pengeluaran per kategori
-merchant terbanyak
-```
-
-#### Laporan
-
-```
-/saldo          # Saldo semua akun
-/ringkasan      # Kondisi keuangan bulan ini
-/pengeluaran    # Total expense
-/pemasukan      # Total income
-/transaksi      # Transaksi terakhir
-```
-
----
-
-## 🖥️ Web Dashboard
-
-### Halaman Utama
-
-- **Dashboard**: Saldo total, cashflow, budget progress
-- **Filter**: Pilih periode (bulan ini, lalu, custom)
-- **Quick Add**: Tombol cepat tambah transaksi
-
-### Manajemen Transaksi
-
-- Tambah edit delete transaksi
-- Pilih kategori, dompet
-- Upload foto struk (OCR otomatis)
-- Import CSV massal
-
-### Manajemen Kategori
-
-- Tambah kategori custom
-- Set jenis (expense/income)
-- Set warna otomatis
-- Validasi penggunaan di transaksi
-
-### Manajemen Akun
-
-- Tambah akun (cash, bank, e-wallet)
-- Set saldo awal
-- Archive akun jika tidak aktif
-
-### Budget Tracking
-
-- Set budget per kategori
-- Progress bar real-time
-- Alert 70%, 90%, 100%
-
----
-
-## 🐳 Installasi Docker
-
-### 1. Setup Environment
+- **Docker Engine 24+** dan **Docker Compose v2**
 
 ```bash
+# Debian/Ubuntu
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER   # lalu logout & login ulang
+```
+
+### Langkah
+
+```bash
+# 1. Clone repo
+git clone https://github.com/Heda312/expenses-tracker.git
 cd expenses-tracker
-cp .env.example .env
+
+# 2. Siapkan folder data & konfigurasi
 mkdir -p data/uploads
-chmod 700 data
-```
+cp .env.example .env
+nano .env                       # isi SECRET_KEY & token bot
 
-Edit `.env`:
+# 3. Build & jalankan
+docker compose up -d --build
 
-```
-APP_NAME="Catat"
-SECRET_KEY="random-string-minimal-32-karakter"
-DATABASE_URL="sqlite:///data/app.db"
-UPLOAD_DIR="data/uploads"
-
-TELEGRAM_BOT_TOKEN="your_token"
-TELEGRAM_ALLOWED_CHAT_ID="your_chat_id"
-
-TIMEZONE="Asia/Jakarta"
-```
-
-### 2. Build & Run
-
-```bash
-docker compose build
-docker compose up -d
-```
-
-### 3. Cek Status
-
-```bash
+# 4. Cek status
 docker compose ps
 docker compose logs -f app
 ```
 
-### 4. Akses Aplikasi
+Buka **http://IP-SERVER:8000**.
 
-- Web: http://localhost:8000
-- Bot: @your_bot (hanya chat_id terdaftar)
-
----
-
-## ⚙️ Konfigurasi
-
-### File .env
-
-| Variabel | Keterangan | Default |
-|----------|------------|---------|
-| `APP_NAME` | Nama aplikasi | "Catat" |
-| `SECRET_KEY` | Key untuk session | *wajib diisi* |
-| `DATABASE_URL` | URL SQLite | `sqlite:///data/app.db` |
-| `UPLOAD_DIR` | Folder upload | `data/uploads` |
-| `TELEGRAM_BOT_TOKEN` | Token bot | *wajib untuk bot* |
-| `TELEGRAM_ALLOWED_CHAT_ID` | Chat ID allowed | *wajib untuk bot* |
-| `TIMEZONE` | Zona waktu | "Asia/Jakarta" |
-
-### Build Custom
+### Perintah harian
 
 ```bash
-# Tanpa tunnel
-docker compose up -d
+docker compose logs -f app      # lihat log
+docker compose restart app      # restart
+docker compose down             # hentikan
+docker compose up -d --build    # update setelah git pull
+```
 
-# Dengan cloudflared tunnel (set TUNNEL_TOKEN)
+### Cloudflare Tunnel (opsional)
+
+Untuk akses dari luar tanpa buka port, isi `TUNNEL_TOKEN` di `.env` lalu:
+
+```bash
 docker compose --profile tunnel up -d
+```
+
+### Instalasi Linux tanpa Docker
+
+```bash
+sudo apt update
+sudo apt install -y python3.11 python3.11-venv git \
+  libgomp1 libglib2.0-0 libgl1 libsm6 libxext6 libxrender1
+
+python3.11 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+
+cp .env.example .env
+nano .env
+
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+### Systemd service (produksi)
+
+`/etc/systemd/system/catat.service`:
+
+```ini
+[Unit]
+Description=Catat Expense Tracker
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/expenses-tracker
+Environment="PATH=/opt/expenses-tracker/.venv/bin"
+ExecStart=/opt/expenses-tracker/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now catat
+sudo systemctl status catat
 ```
 
 ---
 
-## 📁 Struktur Project
+## Konfigurasi
+
+Salin `.env.example` menjadi `.env`:
+
+```env
+# Aplikasi
+APP_NAME="Catat"
+SECRET_KEY="ganti-dengan-string-acak-minimal-32-karakter"
+
+# Database
+DATABASE_URL="sqlite:///data/app.db"
+
+# Sesi login
+SESSION_DAYS=30
+COOKIE_SECURE=false
+LOGIN_MAX_ATTEMPTS=5
+LOGIN_LOCK_MINUTES=15
+
+# Telegram (opsional)
+TELEGRAM_BOT_TOKEN=""
+TELEGRAM_ALLOWED_CHAT_ID=""
+# TELEGRAM_WEBHOOK_URL="https://domain.com/webhook/telegram"
+
+# API untuk agent eksternal (opsional)
+HERMES_API_TOKEN=""
+
+# Migrasi otomatis saat startup
+AUTO_MIGRATE=true
+
+# Zona waktu
+TIMEZONE="Asia/Jakarta"
+```
+
+### Tabel variabel
+
+| Variabel | Wajib | Default | Keterangan |
+|---|---|---|---|
+| `APP_NAME` | – | `Catat` | Nama aplikasi di UI |
+| `SECRET_KEY` | ✅ | – | Key sesi login (min. 32 karakter) |
+| `DATABASE_URL` | – | `sqlite:///data/app.db` | Lokasi database SQLite |
+| `SESSION_DAYS` | – | `30` | Masa berlaku sesi login |
+| `COOKIE_SECURE` | – | `false` | Set `true` jika sudah HTTPS |
+| `LOGIN_MAX_ATTEMPTS` | – | `5` | Batas percobaan login |
+| `LOGIN_LOCK_MINUTES` | – | `15` | Durasi lockout |
+| `TELEGRAM_BOT_TOKEN` | – | – | Token dari @BotFather |
+| `TELEGRAM_ALLOWED_CHAT_ID` | – | – | Chat ID yang diizinkan |
+| `TELEGRAM_WEBHOOK_URL` | – | – | Kosong = mode polling |
+| `HERMES_API_TOKEN` | – | – | Token Bearer untuk `/api/v1` |
+| `AUTO_MIGRATE` | – | `true` | Jalankan Alembic saat startup |
+| `TIMEZONE` | – | `Asia/Jakarta` | Zona waktu tampilan |
+
+Generate `SECRET_KEY` dan `HERMES_API_TOKEN`:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+---
+
+## Menjalankan Aplikasi
+
+```bash
+# Development (auto-reload)
+python -m uvicorn app.main:app --reload
+
+# Produksi
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
+```
+
+| URL | Keterangan |
+|---|---|
+| `http://127.0.0.1:8000` | Dashboard |
+| `http://127.0.0.1:8000/docs` | Swagger API |
+| `http://127.0.0.1:8000/health` | Health check |
+
+> **Catatan:** gunakan `--workers 1`. Bot Telegram berjalan di dalam proses
+> aplikasi; lebih dari satu worker akan membuat bot menerima update ganda.
+
+Saat pertama dibuka, aplikasi mengarahkan ke halaman **Daftar** untuk membuat
+akun admin.
+
+---
+
+## Telegram Bot
+
+1. Buat bot di [@BotFather](https://t.me/BotFather) → salin token
+2. Dapatkan chat ID Anda (kirim pesan ke [@userinfobot](https://t.me/userinfobot))
+3. Isi `.env`:
+
+```env
+TELEGRAM_BOT_TOKEN="123456:ABC..."
+TELEGRAM_ALLOWED_CHAT_ID="8617947659"
+```
+
+4. Restart aplikasi. Bot otomatis jalan dalam mode polling.
+
+### Contoh perintah
+
+```
+makan 35rb
+gaji 8jt
+transfer 500rb bca ke gopay
+
+budget makanan 2jt
+sisa budget
+saldo
+pengeluaran bulan ini
+merchant terbanyak
+
+tambah kategori Snack
+hapus kategori Transport
+```
+
+---
+
+## API untuk Hermes
+
+Dokumentasi lengkap: **[`docs/API_HERMES.md`](docs/API_HERMES.md)**
+
+```env
+HERMES_API_TOKEN="token-acak-panjang"
+```
+
+```bash
+# Catat pengeluaran (dompet & kategori otomatis dibuat)
+curl -X POST http://127.0.0.1:8000/api/v1/transactions \
+  -H "Authorization: Bearer $HERMES_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"kind":"expense","amount":"35rb","account":"BCA","category":"Makanan","merchant":"Indomaret"}'
+
+# Cek saldo
+curl http://127.0.0.1:8000/api/v1/summary \
+  -H "Authorization: Bearer $HERMES_API_TOKEN"
+```
+
+Endpoint utama: `/api/v1/transactions`, `/api/v1/accounts`, `/api/v1/categories`,
+`/api/v1/summary`, `/api/v1/budgets`, `/api/v1/import/csv/text`.
+
+---
+
+## Import & Export CSV
+
+### Export
+
+Halaman **Transaksi** → tombol **Export**:
+
+| Format | Isi |
+|---|---|
+| `catat-transaksi-YYYY-MM.csv` | Transaksi saja — bisa di-import ulang |
+| `catat-YYYY-MM.xlsx` | Excel laporan (transaksi + ringkasan + budget) |
+
+Export **hanya berisi transaksi**. Dompet dan kategori tidak diekspor terpisah —
+keduanya terbentuk otomatis saat import.
+
+### Import
+
+Halaman **Settings** → **Import CSV**, atau via bot/API.
+
+```csv
+Tanggal,Waktu,Jenis,Nominal,Kategori,Merchant,Dompet,Jenis Dompet,Dompet Tujuan,Catatan
+2026-11-07,14:30:00,Pengeluaran,15000,Makanan,Indomaret,BCA,bank,,
+2026-11-07,19:05:00,Pemasukan,8000000,Gaji,Kantor,BCA,bank,,
+2026-11-08,08:00:00,Transfer,500000,,,BCA,bank,GoPay,
+```
+
+| Kolom | Wajib | Keterangan |
+|---|---|---|
+| `Tanggal` | – | `YYYY-MM-DD`, `DD/MM/YYYY`, `DD-MM-YYYY` |
+| `Waktu` | – | `HH:MM` / `HH:MM:SS` — digabung dengan Tanggal |
+| `Jenis` | – | Pengeluaran / Pemasukan / Transfer |
+| `Nominal` | ✅ | `15000`, `15.000`, `15rb` |
+| `Kategori` | – | Auto-create |
+| `Merchant` | – | Nama toko |
+| `Dompet` | – | Auto-create |
+| `Jenis Dompet` | – | `bank`, `ewallet`, `cash` (kosong = ditebak dari nama) |
+| `Dompet Tujuan` | – | Wajib untuk baris Transfer |
+
+Setelah import, saldo semua dompet dihitung ulang otomatis.
+
+---
+
+## Struktur Project
 
 ```
 expenses/
 ├── app/
-│   ├── main.py           # FastAPI entry point
-│   ├── bot.py            # Telegram bot logic
-│   ├── models.py         # SQLAlchemy models
-│   ├── config.py         # Configuration
-│   ├── db.py             # Database session
-│   ├── security.py       # Auth & password hashing
-│   ├── seed.py           # Initial data
-│   ├── cli.py            # CLI commands
+│   ├── main.py              # Entry point FastAPI
+│   ├── bot.py               # Telegram bot
+│   ├── models.py            # Model SQLAlchemy
+│   ├── schemas.py           # Validasi Pydantic
+│   ├── config.py            # Konfigurasi dari .env
+│   ├── db.py                # Engine & session
+│   ├── security.py          # Auth, Argon2, session
+│   ├── schema_patch.py      # Penambal kolom skema
+│   ├── seed.py              # Data awal
+│   ├── webhook.py           # Webhook Telegram
 │   ├── routers/
-│   │   ├── auth.py       # Login/logout
-│   │   ├── dashboard.py  # Dashboard page
-│   │   ├── transactions.py
-│   │   ├── accounts.py
-│   │   ├── categories.py
-│   │   ├── budgets.py
-│   │   ├── export.py
-│   │   ├── ocr.py
-│   │   └── settings_page.py
+│   │   ├── api.py           # REST API /api/v1 (Hermes)
+│   │   ├── auth.py          # Login/register/logout
+│   │   ├── dashboard.py     # Dashboard
+│   │   ├── transactions.py  # CRUD transaksi
+│   │   ├── accounts.py      # CRUD dompet
+│   │   ├── categories.py    # CRUD kategori + import CSV
+│   │   ├── budgets.py       # Budget
+│   │   ├── export.py        # Export Excel/CSV
+│   │   ├── ocr.py           # Endpoint OCR
+│   │   └── settings_page.py # Halaman settings
 │   ├── services/
-│   │   ├── money.py      # Parsing nominals
-│   │   ├── dates.py      # Date utilities
-│   │   ├── ocr.py        # OCR engines
-│   │   ├── classify.py   # Category detection
-│   │   ├── ledger.py     # Balance calc
-│   │   └── budget_alerts.py
-│   ├── templates/        # Jinja2 templates
-│   └── static/           # CSS & JS
+│   │   ├── wallet.py        # Saldo dompet dinamis + auto-create
+│   │   ├── importer.py      # Import CSV (round-trip)
+│   │   ├── export_formats.py# Format CSV
+│   │   ├── ledger.py        # Agregasi laporan
+│   │   ├── dashboard.py     # Data dashboard
+│   │   ├── analytics.py     # Insight
+│   │   ├── periods.py       # Resolusi periode
+│   │   ├── dates.py         # Util tanggal & timezone
+│   │   ├── money.py         # Parsing nominal rupiah
+│   │   ├── ocr.py           # OCR engine wrapper
+│   │   ├── receipt.py       # Parser struk
+│   │   ├── classify.py      # Deteksi kategori
+│   │   ├── merchant.py      # Ingatan merchant
+│   │   ├── cleanup.py       # Hapus dompet/kategori (FK-safe)
+│   │   ├── budget_alerts.py # Alert budget
+│   │   ├── ingest.py        # Draft transaksi
+│   │   └── xlsx.py          # Export Excel
+│   ├── templates/           # Template Jinja2
+│   └── static/              # CSS & JS
 ├── alembic/
-│   ├── env.py
-│   └── versions/         # Migrations
-├── data/                 # SQLite + uploads (gitignore)
-├── tests/                # Unit tests
-├── scripts/              # Helper scripts
-├── docker-compose.yml
+│   └── versions/            # Migrasi database
+├── docs/
+│   └── API_HERMES.md        # Dokumentasi API
+├── scripts/                 # Skrip bantu & smoke test
+├── tests/                   # Unit & integration test
+├── data/                    # SQLite + upload (gitignored)
 ├── Dockerfile
+├── docker-compose.yml
 ├── requirements.txt
-├── requirements-dev.txt
-└── .env.example
+└── requirements-dev.txt
 ```
 
 ---
 
-## 🛠 Tech Stack
+## Testing
 
-| Layer | Technology |
-|-------|------------|
-| Backend | Python 3.12, FastAPI |
-| Database | SQLite + SQLAlchemy + Alembic |
-| Frontend | Jinja2, vanilla JS, modern CSS |
-| Bot | aiogram 3.x |
-| OCR | RapidOCR (fallback EasyOCR) |
-| Security | Argon2 |
-| Export | openpyxl (Excel) |
-| Container | Docker + Docker Compose |
+```bash
+pip install -r requirements-dev.txt
+python -m pytest tests -q
+```
+
+Tes memakai database sementara (`tests/conftest.py`) — **tidak menyentuh**
+`data/app.db`.
+
+```bash
+# Smoke test halaman web
+$env:PYTHONPATH="."; python scripts/smoke_pages.py     # Windows
+PYTHONPATH=. python scripts/smoke_pages.py             # Linux
+```
 
 ---
 
-## 💾 Backup & Restore
+## Backup & Restore
 
 ### Backup
 
 ```bash
+# SQLite: salin file db (hentikan aplikasi dulu untuk konsistensi)
 docker compose stop app
-tar -czf catat-backup-$(date +%Y%m%d).tar.gz data/
+cp data/app.db backup/app-$(date +%F).db
 docker compose start app
 ```
+
+Atau lewat aplikasi: **Transaksi → Export → CSV transaksi** (bisa di-import ulang).
 
 ### Restore
 
 ```bash
 docker compose stop app
-tar -xzf catat-backup-*.tar.gz
+cp backup/app-2026-11-07.db data/app.db
 docker compose start app
-docker compose run --rm app python -m alembic upgrade head
-docker compose up -d
 ```
-
-### Manual Backup
-
-Copy folder `data/` ke lokasi aman.
 
 ---
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
 ### Bot tidak merespons
 
-```bash
-# Cek logs
-docker compose logs bot
-
-# Pastikan config benar
-grep -E "TELEGRAM" .env
-```
+- Pastikan `TELEGRAM_BOT_TOKEN` dan `TELEGRAM_ALLOWED_CHAT_ID` benar
+- Cek log: `docker compose logs -f app` atau terminal
+- Satu bot hanya boleh satu instance (jangan jalankan lokal + server bersamaan)
 
 ### OCR gagal
 
-- Pastikan Python < 3.13
-- Foto harus jelas dan terang
-- Coba rotate foto jika hasil buruk
+- **Windows:** install [VC++ Redistributable x64](https://aka.ms/vs/17/release/vc_redist.x64.exe)
+- **Docker/Linux:** pastikan `libgomp1 libgl1 libglib2.0-0` terpasang
+- Aplikasi otomatis fallback ke EasyOCR kalau RapidOCR gagal
 
 ### Import CSV gagal
 
-- Format header: `tanggal,nominal,kategori,merchant,dompet`
-- Encoding: UTF-8
-- Tanggal: `YYYY-MM-DD`, `DD/MM/YYYY`, `DD-MM-YYYY`
+- Kolom **Nominal** wajib ada
+- Baris transfer butuh **Dompet Tujuan** yang berbeda dari **Dompet**
+- Format tanggal yang didukung: `YYYY-MM-DD`, `DD/MM/YYYY`, `DD-MM-YYYY`
 
-### Web dashboard blank
+### Saldo dompet tidak sesuai
+
+Buka **Dompet → Sinkronkan saldo**, atau panggil
+`POST /api/v1/accounts/sync`. Saldo selalu dihitung ulang dari transaksi
+`confirmed` yang belum dihapus.
+
+### Tidak bisa hapus dompet
+
+Dompet yang masih punya transaksi **aktif** dilindungi. Hapus/pindahkan
+transaksinya dulu, atau gunakan panel hapus di halaman Dompet untuk menghapus
+sekaligus (`?force=true` via API).
+
+### Port 8000 sudah dipakai
 
 ```bash
-# Login dulu
-curl http://localhost:8000/login
-
-# Buat user jika belum ada
-docker compose run --rm app python -m app.cli create-user
-```
-
-### Database error
-
-```bash
-# Cek migrasi
-docker compose run --rm app python -m alembic current
-
-# Jalankan migrasi
-docker compose run --rm app python -m alembic upgrade head
+python -m uvicorn app.main:app --port 8080
 ```
 
 ---
 
-## 🤝 Contributing
+## Changelog
 
-1. Fork repository
-2. Buat branch fitur: `git checkout -b fitur/nama`
-3. Commit: `git commit -m 'Add: fitur baru'`
-4. Push: `git push origin fitur/nama`
-5. Buat Pull Request
+Lihat **[CHANGELOG.md](CHANGELOG.md)** dan **[RELEASE_NOTES_v1.2.0.md](RELEASE_NOTES_v1.2.0.md)**.
 
 ---
 
-## 📄 License
+## Lisensi
 
-MIT License - lihat file `LICENSE` untuk detail.
+MIT — lihat [LICENSE](LICENSE).
 
----
+## Kredit
 
-## 👏 Credits
-
-- OCR: RapidOCR, EasyOCR
-- Bot Framework: aiogram
-- Web Framework: FastAPI
-- Database: SQLAlchemy, SQLite
-- Icons: Emoji native
-
----
-
-**Catat v1.1.0** — Tracking keuangan yang simple dan powerful.
+Dibangun dengan FastAPI, aiogram, SQLAlchemy, RapidOCR, dan EasyOCR.

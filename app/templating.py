@@ -26,6 +26,12 @@ FLASH_MESSAGES = {
     "deleted": ("ok", "Data dihapus."),
     "archived": ("ok", "Dompet diarsipkan."),
     "restored": ("ok", "Dompet diaktifkan kembali."),
+    "synced": ("ok", "Saldo dompet disinkronkan dengan transaksi."),
+    "has_transactions": (
+        "err",
+        "Dompet masih punya transaksi aktif. Hapus transaksinya dulu, "
+        "atau pakai tombol hapus di dalam panel dompet untuk menghapus sekaligus.",
+    ),
     "password": ("ok", "Password diganti. Silakan login ulang."),
     "invalid": ("err", "Data tidak valid. Periksa kembali isian Anda."),
     "notfound": ("err", "Data tidak ditemukan."),

@@ -19,6 +19,8 @@
   <div class="alert error">Semua field harus diisi.</div>
 {% elif flash == "password_mismatch" %}
   <div class="alert error">Konfirmasi password tidak sama.</div>
+{% elif flash == "error" %}
+  <div class="alert error">Gagal menghapus akun. Coba lagi.</div>
 {% endif %}
 
 <section class="grid-2">
@@ -53,10 +55,15 @@
         </div>
       </div>
 
-      <form method="post" action="/settings/delete-account" class="form-grid">
+      <form method="post" action="/settings/delete-account" class="form-grid"
+            onsubmit="return requestConfirm(this, 'Hapus akun dan SEMUA data secara permanen? Tindakan ini tidak bisa dibatalkan.')">
         <div class="field">
-          <label for="delete-password">Password (konfirmasi)</label>
+          <label for="delete-password">Password</label>
           <input id="delete-password" name="password" type="password" autocomplete="current-password" required>
+        </div>
+        <div class="field">
+          <label for="delete-password-confirm">Ketik ulang password</label>
+          <input id="delete-password-confirm" name="confirm_password" type="password" autocomplete="current-password" required>
         </div>
         <p class="hint" style="color: var(--danger); margin-bottom: 16px;">
           Semua data transaksi, dompet, budget, dan akun akan dihapus permanen. Aksi tidak bisa dibatalkan.
@@ -145,8 +152,10 @@
         </div>
       </div>
       <a class="btn btn-block" href="/export.xlsx">Download Excel bulan ini</a>
+      <a class="btn btn-block" href="/export/transaksi.csv">Download CSV transaksi (bisa di-import)</a>
       <p class="hint">
-        Untuk bulan lain, buka halaman Transaksi, pilih bulan, lalu tekan Export Excel.
+        Export hanya berisi transaksi. Saat di-import ulang, dompet dan kategori
+        dibuat otomatis dari transaksi — termasuk jenis dompetnya (tunai/bank/e-wallet).
       </p>
     </div>
 
@@ -182,7 +191,9 @@
           <p style="margin-top: 1rem; color: var(--text-secondary);">
             • Kolom wajib: <strong>nominal</strong><br>
             • Tanggal format: YYYY-MM-DD atau DD/MM/YYYY<br>
-            • Kategori otomatis dibuat jika belum ada
+            • Kategori otomatis dibuat jika belum ada<br>
+            • Dompet di file otomatis dibuat dan langsung terhubung ke transaksi<br>
+            • Saldo dompet dihitung ulang dari transaksi setelah import
           </p>
         </div>
       </details>
@@ -220,12 +231,20 @@ document.getElementById('importForm').addEventListener('submit', async (e) => {
       throw new Error(data.detail || 'Import gagal');
     }
     
+    const wallets = (data.wallets || [])
+      .map((w) => `${w.name}: ${new Intl.NumberFormat('id-ID').format(w.balance)}`)
+      .join('<br>');
+
     result.style.display = 'block';
     result.className = 'alert success';
     result.innerHTML = `
       <strong>✅ Import berhasil!</strong><br>
       ${data.imported} transaksi berhasil diimport
       ${data.errors > 0 ? `<br><span style="color: var(--orange);">⚠️ ${data.errors} baris error</span>` : ''}
+      ${data.accounts_created && data.accounts_created.length
+        ? `<br>👛 Dompet dibuat: ${data.accounts_created.join(', ')}`
+        : ''}
+      ${wallets ? `<br><br><strong>Saldo dompet:</strong><br>${wallets}` : ''}
     `;
     
     fileInput.value = '';

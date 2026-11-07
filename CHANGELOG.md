@@ -1,119 +1,54 @@
 # Changelog
 
-Semua perubahan penting pada project ini akan didokumentasikan di file ini.
+Semua perubahan penting pada Catat didokumentasikan di file ini.
+Format mengikuti Keep a Changelog dan project mengikuti Semantic Versioning.
 
-Format berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-dan project ini mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [1.2.0] - 2026-11-07
 
-## [2.0.0] - 2026-11-02
+### Added
 
-### 🎉 Major Release - Kategori Custom & Import CSV
+- REST API `/api/v1` untuk Hermes/agent eksternal.
+- CRUD transaksi, dompet, kategori, budget, import CSV, dan summary via API.
+- Dokumentasi API lengkap di [`docs/API_HERMES.md`](docs/API_HERMES.md).
+- Saldo dompet dinamis dari transaksi dengan sinkronisasi otomatis.
+- Import CSV round-trip dengan auto-create dompet dan kategori.
+- Kolom `Jenis Dompet` dan `Waktu` pada CSV.
+- Test regresi untuk delete flow, API, import/export, dan loading state.
 
-Ini adalah update besar yang memperkenalkan kategori yang bisa dikustomisasi penuh oleh user, import CSV otomatis, dan CRUD dinamis via bot Telegram.
+### Changed
 
-### ✨ Added
+- Export difokuskan ke transaksi: `/export/transaksi.csv` dan Excel.
+- Export format bank, export dompet, dan backup CSV terpisah dihapus.
+- Dependency OCR dibuat eksplisit di `requirements.txt`.
+- README diperbarui untuk Windows, Linux Docker, konfigurasi, API, dan upgrade.
+- Loading form memakai `is-submitting` agar teks tombol tidak ikut berputar.
 
-#### CRUD Kategori Dinamis
-- Kategori kosong saat setup awal (tanpa seed default)
-- CRUD kategori lengkap via Telegram bot:
-  - Tambah kategori: `tambah kategori Snack`
-  - Hapus kategori: `hapus kategori Transport`
-  - Ubah nama: `ubah kategori Makan jadi Makanan`
-- Konfirmasi 2-step untuk tambah kategori (pilih jenis + konfirmasi final)
-- Validasi penggunaan kategori di transaksi sebelum hapus
-- Halaman `/categories` di web untuk manage kategori
-- API endpoints: GET, POST, PUT, DELETE `/api/categories`
+### Fixed
 
-#### Import/Export CSV
-- Import CSV via halaman Settings di web
-- Import CSV via bot Telegram (command `/import`)
-- Auto-detect format CSV (flexible column mapping)
-- Auto-create kategori baru saat import
-- Multiple date format support (YYYY-MM-DD, DD/MM/YYYY, dll)
-- Error reporting detail per baris
-- Success/error count summary
+- Hapus akun sekarang menghapus seluruh data dan kembali ke register.
+- Hapus dompet/kategori aman terhadap foreign key dan soft-deleted transaction.
+- Jam transaksi tidak berubah menjadi `00:00` setelah import CSV.
+- Transfer tetap memiliki dompet tujuan saat round-trip CSV.
+- Import tidak salah membedakan `Jenis` dan `Jenis Dompet`.
 
-#### Bot Enhancements
-- Query info dengan periode awareness:
-  - `berapa transaksi bulan ini` vs `total transaksi`
-  - `budget apa saja bulan lalu`
-- Query breakdown baru:
-  - `pengeluaran per kategori` - Top 10 kategori dengan persentase
-  - `merchant terbanyak` - Most frequent merchants
-  - `daftar akun` - List akun dengan saldo real-time
-- Parser logic improved: prioritas query vs transaksi
-- Budget edit dengan input manual (bukan preset amount)
-- Konfirmasi interaktif untuk semua CRUD operations
+### Removed
 
-#### UI/UX Improvements
-- Filter periode transaksi (dropdown selector di halaman Transaksi)
-- Alert modal global yang menggantikan native `alert()`
-- Background gradient decoration di semua halaman
-- Grid layout kategori responsive (2 kolom desktop, 1 kolom mobile)
-- Modal close on backdrop click
-- Button consistency dengan global theme
-- Typography & spacing optimized untuk readability
-- Style minimalis compact elegan di semua komponen
+- Script diagnostic/eksperimen lama yang tidak digunakan.
+- Database kosong/sisa test dari repository.
+- Dokumentasi release lama yang duplikat.
 
-### 🔄 Changed
+## [1.1.0] - 2026-11-02
 
-#### Breaking Changes
-- **Kategori default dihapus** - User harus tambah kategori sendiri
-- Database seed minimal (hanya akun Cash)
+- Peningkatan UI grid dan format response bot.
+- CRUD transaksi via bot.
+- Filter periode dan peningkatan dashboard.
+- CRUD kategori dan pengelolaan dompet.
+- Budget tracking dan alert.
 
-#### Non-Breaking Changes
-- Parser natural language lebih akurat (nominal vs query)
-- Budget preview dengan modal interaktif (edit kategori & nominal)
-- Response format bot lebih konsisten (header center-aligned)
-- Border radius uniform (8px-16px)
-- Shadow & glow effects subtle
+## [1.0.0]
 
-### 🐛 Fixed
-- Bug `UnboundLocalError` di CRUD kategori handler
-- Query "berapa sisa saldo" salah dikenali sebagai transaksi
-- Parser tidak recognize query tanpa nominal
-- Modal transparency issue di kategori page
-- Button size inconsistency di halaman kategori
-- Hover effect terlalu aggresive (putih semua)
+- Release awal web dashboard dan Telegram bot.
+- SQLite, OCR struk, parsing transaksi, budget, dan export laporan.
 
-### 🔧 Technical
-- Tambah `Form()` parameter di FastAPI endpoints
-- Better error logging di frontend (console.error)
-- State management untuk budget nominal input
-- Callback handlers untuk konfirmasi CRUD
-- Period-aware query functions
-- Merchant statistics aggregation
-- Balance calculation dari ledger service
-
-### 📚 Documentation
-- README.md lengkap dengan panduan setup & fitur
-- Format CSV untuk import
-- Perintah bot Telegram comprehensive
-- Troubleshooting guide
-- Update & migration guide dari v1.x
-- Contributing guidelines
-
-### 🗂️ Files Changed
-- `app/bot.py` - +1338 lines (CRUD, import, query enhancements)
-- `app/seed.py` - Minimal seed (kategori dihapus)
-- `app/main.py` - Register categories router
-- `app/routers/categories.py` - NEW (CRUD API & page)
-- `app/templates/categories.html` - NEW (kategori management UI)
-- `app/templates/base.html` - Alert modal global & background decoration
-- `app/templates/transactions.html` - Filter periode dropdown
-- `app/templates/settings.html` - Import CSV section
-- `README.md` - Complete rewrite untuk v2.0.0
-- `CHANGELOG.md` - NEW (this file)
-
----
-
-## [1.0.0] - 2024-XX-XX
-
-### Initial Release
-- Telegram bot dengan OCR struk
-- Natural language input transaksi
-- Web dashboard dengan budget tracking
-- Multi-wallet support
-- Export Excel & CSV
-- Kategori seed default (28 kategori)
-- Dark mode theme
+[1.2.0]: https://github.com/Heda312/expenses-tracker/releases/tag/v1.2.0
+[1.1.0]: https://github.com/Heda312/expenses-tracker/releases/tag/v1.1.0

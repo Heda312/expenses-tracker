@@ -16,7 +16,18 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.db import SessionLocal
-from app.routers import accounts, auth, budgets, categories, dashboard, export, ocr, settings_page, transactions
+from app.routers import (
+    accounts,
+    api,
+    auth,
+    budgets,
+    categories,
+    dashboard,
+    export,
+    ocr,
+    settings_page,
+    transactions,
+)
 from app.security import RedirectToLogin, require_user
 from app.seed import ensure_seed
 from app import webhook
@@ -31,8 +42,11 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 def _run_migrations() -> None:
     """Jalankan migrasi Alembic; kalau gagal, pastikan tabel dasar tetap ada."""
+    from app.schema_patch import ensure_columns
+
     if not settings.auto_migrate:
         logger.info("AUTO_MIGRATE=false, migrasi dilewati.")
+        ensure_columns()
         return
     try:
         from alembic import command
@@ -48,6 +62,11 @@ def _run_migrations() -> None:
         # tetap bisa dipakai; create_all menambal tabel yang belum dibuat.
         logger.exception("Migrasi database gagal, fallback ke create_all")
         Base.metadata.create_all(engine)
+    finally:
+        # Pastikan kolom baru tetap ada walau migrasi dilewati/gagal.
+        ensure_columns()
+
+
 
 
 @asynccontextmanager
@@ -57,6 +76,11 @@ async def lifespan(_app: FastAPI):
     # Isi kategori & dompet default saat pertama kali dijalankan.
     with SessionLocal() as db:
         ensure_seed(db)
+        # Hitung ulang saldo dompet dari transaksi yang sudah ada, supaya
+        # cache saldo tidak pernah basi setelah upgrade.
+        from app.services import wallet
+
+        wallet.sync_balances(db)
 
     bot_task = None
     if settings.telegram_bot_token:
@@ -190,4 +214,5 @@ app.include_router(budgets.router)
 app.include_router(export.router)
 app.include_router(ocr.router)
 app.include_router(settings_page.router)
+app.include_router(api.router)
 app.include_router(webhook.router)

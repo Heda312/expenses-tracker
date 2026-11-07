@@ -29,7 +29,7 @@ from app.services import ingest
 from app.services.dates import format_dt
 from app.services.merchant import remember_merchant
 from app.services.money import extract_amount, format_idr, parse_amount
-from app.services import ledger
+from app.services import ledger, wallet
 from app.services.dates import current_period, now_local, to_utc, shift_period, month_bounds, period_label
 from app.services.budget_alerts import check_and_send_alerts
 
@@ -521,153 +521,39 @@ async def _handle_rename_category(db: Session, text: str, message: Message) -> N
 
 
 async def _import_csv(db: Session, content: str, message: Message) -> str:
-    """Parse dan import transaksi dari CSV dengan auto-detect format."""
-    import csv
-    from io import StringIO
-    from datetime import datetime
-    from app.models import Category, Account, Transaction
-    from sqlalchemy import select
-    
-    lines = content.strip().split('\n')
-    if len(lines) < 2:
-        return "❌ File CSV kosong atau tidak valid"
-    
-    # Parse CSV
-    reader = csv.reader(StringIO(content))
-    rows = list(reader)
-    
-    if len(rows) < 2:
-        return "❌ File CSV harus punya header dan minimal 1 data"
-    
-    header = [h.strip().lower() for h in rows[0]]
-    data_rows = rows[1:]
-    
-    # Auto-detect columns
-    col_map = {}
-    
-    # Detect tanggal column
-    for idx, h in enumerate(header):
-        if any(w in h for w in ['tanggal', 'date', 'tgl', 'waktu']):
-            col_map['date'] = idx
-        elif any(w in h for w in ['nominal', 'amount', 'jumlah', 'total']):
-            col_map['amount'] = idx
-        elif any(w in h for w in ['kategori', 'category', 'cat']):
-            col_map['category'] = idx
-        elif any(w in h for w in ['merchant', 'toko', 'tempat', 'keterangan', 'deskripsi']):
-            col_map['merchant'] = idx
-        elif any(w in h for w in ['dompet', 'account', 'wallet', 'akun']):
-            col_map['account'] = idx
-    
-    # Validasi kolom wajib
-    if 'amount' not in col_map:
-        return "❌ Kolom nominal tidak ditemukan"
-    
-    # Load categories dan accounts
-    categories_db = {c.name.lower(): c for c in db.scalars(select(Category)).all()}
-    accounts_db = {a.name.lower(): a for a in db.scalars(select(Account)).all()}
-    
-    # Default account jika tidak ada di CSV
-    default_account = db.scalar(select(Account).limit(1))
-    if not default_account:
-        return "❌ Tidak ada akun. Buat akun dulu."
-    
-    imported = 0
-    errors = []
-    
-    for row_idx, row in enumerate(data_rows, start=2):
-        if len(row) < len(col_map):
-            errors.append(f"Baris {row_idx}: kolom tidak lengkap")
-            continue
-        
-        try:
-            # Parse amount
-            amount_str = row[col_map['amount']].strip().replace(',', '').replace('.', '')
-            amount = int(''.join(filter(str.isdigit, amount_str)))
-            
-            if amount <= 0:
-                errors.append(f"Baris {row_idx}: nominal tidak valid")
-                continue
-            
-            # Parse date
-            occurred_at = None
-            if 'date' in col_map:
-                date_str = row[col_map['date']].strip()
-                # Try multiple formats
-                for fmt in ['%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y', '%Y/%m/%d']:
-                    try:
-                        occurred_at = datetime.strptime(date_str, fmt)
-                        break
-                    except:
-                        continue
-            
-            if not occurred_at:
-                occurred_at = datetime.now()
-            
-            # Parse category
-            category_id = None
-            if 'category' in col_map:
-                cat_name = row[col_map['category']].strip().lower()
-                if cat_name in categories_db:
-                    category_id = categories_db[cat_name].id
-                elif cat_name:
-                    # Buat kategori baru otomatis
-                    new_cat = Category(name=row[col_map['category']].strip().title(), kind='expense')
-                    db.add(new_cat)
-                    db.flush()
-                    category_id = new_cat.id
-                    categories_db[cat_name] = new_cat
-            
-            # Parse account
-            account_id = default_account.id
-            if 'account' in col_map:
-                acc_name = row[col_map['account']].strip().lower()
-                if acc_name in accounts_db:
-                    account_id = accounts_db[acc_name].id
-            
-            # Parse merchant
-            merchant = None
-            if 'merchant' in col_map and row[col_map['merchant']].strip():
-                merchant = row[col_map['merchant']].strip()
-            
-            # Buat transaksi
-            transaction = Transaction(
-                kind='expense',
-                amount=amount,
-                account_id=account_id,
-                category_id=category_id,
-                merchant=merchant,
-                occurred_at=occurred_at,
-                source='telegram',
-                status='confirmed',
-                telegram_chat_id=message.chat.id
-            )
-            
-            db.add(transaction)
-            imported += 1
-            
-        except Exception as e:
-            errors.append(f"Baris {row_idx}: {str(e)}")
-    
-    db.commit()
-    
-    # Build result message
+    """Import CSV lewat service bersama (dompet otomatis dibuat & disinkronkan)."""
+    from app.services import importer
+
+    result = importer.import_csv(db, content, source="telegram")
+
+    if result.imported == 0:
+        detail = result.messages[0] if result.messages else "File tidak bisa dibaca"
+        return f"❌ Import gagal: {detail}"
+
     lines = [
         "━━━━━━━━━━━━━━━━━━━━━━━",
         "  <b>📥 Import Selesai</b>",
         "━━━━━━━━━━━━━━━━━━━━━━━",
         "",
-        f"✅  {imported} transaksi berhasil",
+        f"✅  {result.imported} transaksi berhasil",
     ]
-    
-    if errors:
-        lines.append(f"⚠️  {len(errors)} baris error")
+
+    if result.accounts_created:
+        names = ", ".join(result.accounts_created[:5])
+        extra = "" if len(result.accounts_created) <= 5 else " ..."
+        lines.append(f"👛  Dompet dibuat: {names}{extra}")
+
+    if result.errors:
+        lines.append(f"⚠️  {result.errors} baris error")
+        for note in result.messages[:5]:
+            lines.append(f"• {note}")
+
+    if result.wallets:
         lines.append("")
-        lines.append("<i>Error detail:</i>")
-        for err in errors[:5]:
-            lines.append(f"• {err}")
-        if len(errors) > 5:
-            lines.append(f"... +{len(errors) - 5} error lainnya")
-    
+        lines.append("<i>Saldo dompet (dari transaksi):</i>")
+        for wallet_info in result.wallets[:5]:
+            lines.append(f"• {wallet_info['name']}: {format_idr(wallet_info['balance'])}")
+
     return "\n".join(lines)
 
 
@@ -1589,6 +1475,7 @@ async def handle_new_amount(message: Message, state: FSMContext) -> None:
 
         transaction.amount = amount
         db.commit()
+        wallet.sync_balances(db)
 
         text, keyboard = _render(db, transaction)
 
@@ -1781,6 +1668,7 @@ async def callback_confirm(callback: CallbackQuery) -> None:
         if transaction.merchant and transaction.category_id:
             remember_merchant(db, transaction.merchant, transaction.category_id)
         db.commit()
+        wallet.sync_balances(db)
 
         category = db.get(Category, transaction.category_id) if transaction.category_id else None
         account = db.get(Account, transaction.account_id) if transaction.account_id else None
@@ -1882,6 +1770,7 @@ async def callback_delete_confirm(callback: CallbackQuery) -> None:
         transaction.status = "rejected"
         transaction.deleted_at = utcnow()
         db.commit()
+        wallet.sync_balances(db)
 
     result = (
         "━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -2092,6 +1981,7 @@ async def callback_hapus_single(callback: CallbackQuery) -> None:
         transaction.status = "rejected"
         transaction.deleted_at = utcnow()
         db.commit()
+        wallet.sync_balances(db)
     
     result = (
         "━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -2246,6 +2136,7 @@ async def callback_hapus_multi_confirm(callback: CallbackQuery, state: FSMContex
             tx.deleted_at = utcnow()
         
         db.commit()
+        wallet.sync_balances(db)
         
         total_amount = sum(tx.amount for tx in transactions)
         
@@ -2300,6 +2191,7 @@ async def cmd_hapus_confirm(message: Message, state: FSMContext) -> None:
             tx.deleted_at = utcnow()
         
         db.commit()
+        wallet.sync_balances(db)
         
         total_amount = sum(tx.amount for tx in transactions)
         
@@ -2476,16 +2368,22 @@ async def callback_category_delete_confirm(callback: CallbackQuery) -> None:
     
     with SessionLocal() as db:
         from app.models import Category
-        
+        from app.services import cleanup
+
         category = db.get(Category, category_id)
         if not category:
             await callback.answer("❌ Kategori tidak ditemukan", show_alert=True)
             return
-        
+
         name = category.name
-        db.delete(category)
-        db.commit()
-        
+        result = cleanup.delete_category(db, category_id)
+        if not result.deleted:
+            await callback.answer(
+                f"⚠️ Kategori dipakai di {result.active_transactions} transaksi aktif",
+                show_alert=True,
+            )
+            return
+
         await callback.message.edit_text(
             "━━━━━━━━━━━━━━━━━━━━━━━\n"
             "  <b>✅ Kategori Dihapus</b>\n"

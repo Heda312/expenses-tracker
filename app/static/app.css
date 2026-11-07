@@ -39,7 +39,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Loading spinner */
+/* Loading spinner (elemen mandiri: <span class="loading">) */
 .loading {
   display: inline-block;
   width: 20px;
@@ -59,12 +59,16 @@ body {
   cursor: not-allowed;
 }
 
-.btn.loading {
+/* State saat form sedang dikirim.
+   Jangan memakai class ".loading" di sini: class itu adalah spinner dan
+   membuat seluruh isi tombol/form ikut berputar. */
+.btn.is-submitting {
   position: relative;
   pointer-events: none;
+  color: transparent;
 }
 
-.btn.loading::after {
+.btn.is-submitting::after {
   content: "";
   position: absolute;
   width: 16px;
@@ -79,7 +83,7 @@ body {
   animation: spin 0.8s linear infinite;
 }
 
-form.loading {
+form.is-submitting {
   opacity: 0.6;
   pointer-events: none;
 }
@@ -947,6 +951,41 @@ select {
   font-size: 18px;
   font-weight: 650;
   letter-spacing: -0.02em;
+}
+
+.account-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(148, 163, 184, 0.08);
+  border: 1px solid var(--line);
+}
+
+.danger-zone > summary {
+  display: inline-flex;
+  list-style: none;
+  cursor: pointer;
+}
+
+.danger-zone > summary::-webkit-details-marker {
+  display: none;
+}
+
+.danger-zone-panel {
+  margin-top: 8px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(244, 63, 94, 0.35);
+  background: rgba(244, 63, 94, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.danger-zone-panel p {
+  margin: 0;
 }
 
 .inline-form {

@@ -4,6 +4,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import Account, Budget, Category, Transaction
+from app.services import wallet
 from app.services.dates import current_period, month_bounds, period_label, shift_period, now_local, to_utc
 from datetime import datetime, timedelta
 
@@ -16,75 +17,17 @@ def _sum(db: Session, *conditions) -> int:
 
 
 def account_balances(db: Session) -> list[dict]:
-    """Saldo tiap dompet = saldo awal + masuk - keluar - transfer keluar + transfer masuk.
-    Optimized: single query untuk semua akun."""
-    
-    from sqlalchemy import case
-    
-    # Aggregate all transactions per account in one query
-    income_subq = (
-        select(
-            Transaction.account_id,
-            func.coalesce(func.sum(
-                case((Transaction.kind == "income", Transaction.amount), else_=0)
-            ), 0).label("income"),
-            func.coalesce(func.sum(
-                case((Transaction.kind == "expense", Transaction.amount), else_=0)
-            ), 0).label("expense"),
-            func.coalesce(func.sum(
-                case((Transaction.kind == "transfer", Transaction.amount), else_=0)
-            ), 0).label("transfer_out"),
-        )
-        .where(*ACTIVE)
-        .group_by(Transaction.account_id)
-        .subquery()
-    )
-    
-    # Transfer in (to_account_id)
-    transfer_in_subq = (
-        select(
-            Transaction.to_account_id.label("account_id"),
-            func.coalesce(func.sum(Transaction.amount), 0).label("transfer_in")
-        )
-        .where(Transaction.kind == "transfer", *ACTIVE)
-        .group_by(Transaction.to_account_id)
-        .subquery()
-    )
-    
-    # Join with accounts
-    query = (
-        select(
-            Account.id,
-            Account.name,
-            Account.kind,
-            Account.opening_balance,
-            func.coalesce(income_subq.c.income, 0).label("income"),
-            func.coalesce(income_subq.c.expense, 0).label("expense"),
-            func.coalesce(income_subq.c.transfer_out, 0).label("transfer_out"),
-            func.coalesce(transfer_in_subq.c.transfer_in, 0).label("transfer_in"),
-        )
-        .outerjoin(income_subq, Account.id == income_subq.c.account_id)
-        .outerjoin(transfer_in_subq, Account.id == transfer_in_subq.c.account_id)
-        .where(Account.archived.is_(False))
-        .order_by(Account.name)
-    )
-    
-    result = []
-    for row in db.execute(query):
-        balance = row.opening_balance + row.income - row.expense - row.transfer_out + row.transfer_in
-        result.append({
-            "id": row.id,
-            "name": row.name,
-            "kind": row.kind,
-            "opening_balance": row.opening_balance,
-            "balance": balance,
-        })
-    
-    return result
+    """Saldo tiap dompet, dihitung langsung dari transaksi.
+
+    Saldo tidak pernah "dipatok" saat dompet dibuat: nilainya dinamis
+    mengikuti pemasukan, pengeluaran, dan transfer. Implementasi ada di
+    app/services/wallet.py supaya web, bot, dan API memakai rumus yang sama.
+    """
+    return wallet.balances(db)
 
 
 def total_balance(db: Session) -> int:
-    return sum(item["balance"] for item in account_balances(db))
+    return wallet.total_balance(db)
 
 
 def summary(db: Session, period: str) -> dict:

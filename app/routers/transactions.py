@@ -20,7 +20,7 @@ from app.schemas import TransactionInput
 from app.security import check_origin, require_user
 from app.services.dates import current_period, to_local, valid_period
 from app.services.periods import build_period_context, resolve_period
-from app.services import classify
+from app.services import classify, wallet
 from app.templating import templates
 
 router = APIRouter()
@@ -236,6 +236,7 @@ def create_transaction(
     db.flush()
     _audit(db, transaction, "create", None)
     db.commit()
+    wallet.sync_balances(db)
     db.refresh(transaction)
     
     # Check budget alerts for expense (sync version for web)
@@ -301,12 +302,12 @@ def update_transaction(
         transaction.category_id = None
     transaction.category_source = "manual"
 
-    # Saldo dompet tidak disimpan di tabel accounts: selalu dihitung ulang
-    # dari transaksi di app/services/ledger.py, jadi tidak perlu disesuaikan
-    # manual saat transaksi dibuat/diubah/dihapus.
+    # Saldo dompet selalu dihitung ulang dari transaksi setelah perubahan
+    # (lihat app/services/wallet.py), jadi cache saldo ikut diperbarui.
 
     _audit(db, transaction, "update", before)
     db.commit()
+    wallet.sync_balances(db)
 
     return _back(selected, "updated")
 
@@ -335,6 +336,7 @@ def confirm_transaction(
     transaction.status = "confirmed"
     _audit(db, transaction, "update", before)
     db.commit()
+    wallet.sync_balances(db)
     
     # Check budget alerts after edit (if expense category changed or amount changed)
     if transaction.kind == "expense" and transaction.category_id:
@@ -369,6 +371,7 @@ def delete_transaction(
     transaction.deleted_at = utcnow()
     _audit(db, transaction, "delete", before)
     db.commit()
+    wallet.sync_balances(db)
     
     # Check budget alerts after delete (if was expense)
     if transaction.kind == "expense" and transaction.category_id:
@@ -407,13 +410,14 @@ def bulk_delete_transactions(
     if not transactions:
         return _back(selected, "notfound")
 
-    # Soft delete. Saldo dompet otomatis sesuai query ledger.py (exclude deleted_at)
+    # Soft delete. Saldo dompet dihitung ulang dari transaksi (exclude deleted_at)
     now = utcnow()
     for tx in transactions:
         before = _snapshot(tx)
         tx.deleted_at = now
         _audit(db, tx, "delete", before)
     db.commit()
+    wallet.sync_balances(db)
     
     # Verify deletion by reloading
     remaining = db.scalars(

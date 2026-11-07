@@ -45,6 +45,13 @@ class Account(Base):
     archived: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
+    # Cache saldo terakhir yang sudah dihitung dari transaksi.
+    # Sumber kebenaran tetap tabel transactions (lihat app/services/wallet.py);
+    # kolom ini hanya supaya saldo dompet ikut tersimpan dan bisa dibaca
+    # cepat oleh API/bot tanpa agregasi ulang.
+    cached_balance: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    balance_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
 
 import hashlib
 

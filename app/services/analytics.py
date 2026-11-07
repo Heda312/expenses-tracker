@@ -2,10 +2,10 @@
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
 
-from app.models import Transaction, Budget, Category, Account
-from app.services.dates import current_period, month_bounds, shift_period, now_local
+from app.models import Transaction, Budget, Category
+from app.services import wallet
+from app.services.dates import month_bounds, shift_period, now_local
 from app.services.money import format_idr
 
 
@@ -228,40 +228,9 @@ def simple_summary(db: Session, period: str) -> dict:
     )) or 0
     
     net = income - expense
-    
-    # Account balances
-    accounts = db.scalars(select(Account).where(Account.archived == False)).all()
-    total_balance = 0
-    for acc in accounts:
-        acc_income = db.scalar(select(func.coalesce(func.sum(Transaction.amount), 0)).where(
-            Transaction.kind == "income",
-            Transaction.account_id == acc.id,
-            Transaction.status == "confirmed",
-            Transaction.deleted_at.is_(None)
-        )) or 0
-        
-        acc_expense = db.scalar(select(func.coalesce(func.sum(Transaction.amount), 0)).where(
-            Transaction.kind == "expense",
-            Transaction.account_id == acc.id,
-            Transaction.status == "confirmed",
-            Transaction.deleted_at.is_(None)
-        )) or 0
-        
-        acc_transfer_out = db.scalar(select(func.coalesce(func.sum(Transaction.amount), 0)).where(
-            Transaction.kind == "transfer",
-            Transaction.account_id == acc.id,
-            Transaction.status == "confirmed",
-            Transaction.deleted_at.is_(None)
-        )) or 0
-        
-        acc_transfer_in = db.scalar(select(func.coalesce(func.sum(Transaction.amount), 0)).where(
-            Transaction.kind == "transfer",
-            Transaction.to_account_id == acc.id,
-            Transaction.status == "confirmed",
-            Transaction.deleted_at.is_(None)
-        )) or 0
-        
-        total_balance += acc.opening_balance + acc_income - acc_expense - acc_transfer_out + acc_transfer_in
+
+    # Saldo dompet selalu dihitung dari transaksi (lihat app/services/wallet.py)
+    total_balance = wallet.total_balance(db)
     
     return {
         "income": income,

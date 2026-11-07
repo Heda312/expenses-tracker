@@ -5,13 +5,20 @@
 <div class="page-head">
   <div>
     <h1>Dompet</h1>
-    <p class="muted">Total saldo {{ format_idr(total_balance) }}</p>
+    <p class="muted">
+      Total saldo {{ format_idr(total_balance) }} &middot;
+      saldo dihitung otomatis dari transaksi
+    </p>
   </div>
+  <form method="post" action="/accounts/sync" class="inline-form">
+    <button class="btn btn-sm btn-ghost" type="submit">Sinkronkan saldo</button>
+  </form>
 </div>
 
 <section class="grid-2">
   <div class="stack">
     {% for account in accounts %}
+      {% set detail = details.get(account.id) %}
       <div class="card account-card {% if account.archived %}is-archived{% endif %}">
         <div class="account-head">
           <div>
@@ -23,6 +30,22 @@
           </div>
           <div class="account-balance num">{{ format_idr(balances.get(account.id, 0)) }}</div>
         </div>
+
+        {% if detail %}
+          <div class="account-flow">
+            <span class="cell-sub">
+              Masuk {{ format_idr(detail.income + detail.transfer_in) }}
+              &middot; Keluar {{ format_idr(detail.expense + detail.transfer_out) }}
+              &middot; {{ detail.transaction_count }} transaksi
+            </span>
+            <span class="cell-sub">
+              Saldo awal {{ format_idr(detail.opening_balance) }}
+              {% if detail.balance_updated_at %}
+                &middot; sync {{ format_dt(detail.balance_updated_at) }}
+              {% endif %}
+            </span>
+          </div>
+        {% endif %}
 
         <form method="post" action="/accounts/{{ account.id }}/update" class="form-grid">
           <div class="form-row">
@@ -54,11 +77,36 @@
           </button>
         </form>
 
-        <form method="post" action="/accounts/{{ account.id }}/delete" class="inline-form">
-          <button class="btn btn-sm btn-ghost btn-danger" type="submit">
-            Hapus
-          </button>
-        </form>
+        {% set active_count = active_counts.get(account.id, 0) %}
+        <details class="danger-zone">
+          <summary class="btn btn-sm btn-ghost btn-danger">Hapus</summary>
+          <div class="danger-zone-panel">
+            {% if active_count %}
+              <p class="cell-sub">
+                Dompet ini masih dipakai <strong>{{ active_count }} transaksi aktif</strong>.
+                Hapus transaksinya dulu, atau pindahkan ke dompet lain.
+              </p>
+              <p class="cell-sub">
+                Kalau tetap dihapus, {{ active_count }} transaksi tersebut ikut terhapus permanen
+                dan laporan bulan terkait akan berubah.
+              </p>
+              <form method="post" action="/accounts/{{ account.id }}/delete">
+                <input type="hidden" name="force" value="1">
+                <button class="btn btn-sm btn-danger" type="submit">
+                  Hapus dompet + {{ active_count }} transaksi
+                </button>
+              </form>
+            {% else %}
+              <p class="cell-sub">
+                Tidak ada transaksi aktif. Dompet akan dihapus; riwayat transaksi yang
+                sudah dihapus sebelumnya ikut dibersihkan.
+              </p>
+              <form method="post" action="/accounts/{{ account.id }}/delete">
+                <button class="btn btn-sm btn-danger" type="submit">Hapus dompet</button>
+              </form>
+            {% endif %}
+          </div>
+        </details>
       </div>
     {% endfor %}
   </div>
@@ -89,6 +137,7 @@
       <div class="field">
         <label for="new-balance">Saldo awal</label>
         <input id="new-balance" name="opening_balance" value="0" inputmode="numeric">
+        <span class="hint">Saldo berjalan tetap mengikuti transaksi.</span>
       </div>
       <button class="btn btn-primary" type="submit">Tambah</button>
     </form>

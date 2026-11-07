@@ -40,6 +40,9 @@ class Settings(BaseSettings):
 
     # Terapkan migrasi database otomatis saat startup.
     auto_migrate: bool = True
+
+    # Token untuk Hermes bot (REST API /api/v1). Kosong = API dimatikan.
+    hermes_api_token: str = ""
     
     @property
     def telegram_chat_id(self) -> int | None:

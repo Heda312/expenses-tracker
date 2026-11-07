@@ -13,6 +13,12 @@ KIND_LABEL = {
     "transfer": "Transfer",
 }
 
+KIND_LABEL_ACCOUNT = {
+    "cash": "Tunai",
+    "bank": "Bank",
+    "ewallet": "E-wallet",
+}
+
 HEADER_FILL = PatternFill("solid", fgColor="1F2937")
 HEADER_FONT = Font(color="FFFFFF", bold=True, size=11)
 TITLE_FONT = Font(bold=True, size=14, color="111827")
@@ -28,26 +34,47 @@ def _style_header(sheet, columns: int) -> None:
         cell.alignment = Alignment(horizontal="center", vertical="center")
 
 
-def build_workbook(rows: list[dict], summary: dict, by_category: list[dict]) -> BytesIO:
+def build_workbook(
+    rows: list[dict],
+    summary: dict,
+    by_category: list[dict],
+) -> BytesIO:
     workbook = Workbook()
 
     # --- Sheet 1: daftar transaksi -----------------------------------------
     sheet = workbook.active
     sheet.title = "Transaksi"
-    headers = ["Tanggal", "Jenis", "Kategori", "Dompet", "Merchant", "Catatan", "Nominal", "Sumber"]
+    headers = [
+        "Tanggal",
+        "Waktu",
+        "Jenis",
+        "Nominal",
+        "Kategori",
+        "Dompet",
+        "Jenis Dompet",
+        "Merchant",
+        "Catatan",
+        "Status",
+        "Sumber",
+        "Reference ID",
+    ]
     sheet.append(headers)
 
     for row in rows:
         sheet.append(
             [
-                row["date"],
+                row.get("date", ""),
+                row.get("time", ""),
                 KIND_LABEL.get(row["kind"], row["kind"]),
-                row["category"],
-                row["account"],
-                row["merchant"],
-                row["note"],
-                row["amount"],
-                row["source"],
+                row.get("amount", 0),
+                row.get("category") or "",
+                row.get("account") or "",
+                KIND_LABEL_ACCOUNT.get(row.get("account_kind"), row.get("account_kind") or ""),
+                row.get("merchant") or "",
+                row.get("note") or "",
+                row.get("status", "confirmed"),
+                row.get("source") or "",
+                row.get("id", ""),
             ]
         )
 
@@ -55,12 +82,12 @@ def build_workbook(rows: list[dict], summary: dict, by_category: list[dict]) -> 
     sheet.freeze_panes = "A2"
     sheet.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{max(sheet.max_row, 1)}"
 
-    widths = [18, 14, 20, 16, 26, 34, 16, 12]
+    widths = [14, 10, 14, 16, 22, 18, 14, 26, 32, 12, 12, 12]
     for index, width in enumerate(widths, start=1):
         sheet.column_dimensions[get_column_letter(index)].width = width
 
     for row_number in range(2, sheet.max_row + 1):
-        sheet.cell(row=row_number, column=7).number_format = '#,##0'
+        sheet.cell(row=row_number, column=4).number_format = '#,##0'
         for column in range(1, len(headers) + 1):
             sheet.cell(row=row_number, column=column).border = THIN_BORDER
 

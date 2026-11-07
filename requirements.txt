@@ -1,27 +1,38 @@
-# Web
+# ============================================================
+# Catat v1.2.0 — Runtime dependencies
+# Python 3.11+ (diuji di 3.11 & 3.12)
+# Install: pip install -r requirements.txt
+# ============================================================
+
+# --- Web framework -------------------------------------------
 fastapi>=0.115,<1.0
 uvicorn[standard]>=0.30
 jinja2>=3.1
 python-multipart>=0.0.9
 
-# Database
+# --- Database ------------------------------------------------
 sqlalchemy>=2.0,<2.2
 alembic>=1.13
 pydantic>=2.7
 pydantic-settings>=2.3
 
-# Telegram
+# --- Telegram bot --------------------------------------------
 aiogram>=3.13,<4
 
-# OCR + parsing
+# --- OCR + parsing -------------------------------------------
+# rapidocr-onnxruntime: engine utama (Windows & Linux)
+# easyocr: fallback lintas platform (butuh RAM lebih besar)
 rapidocr-onnxruntime>=1.4,<1.5
 easyocr>=1.7,<2
+opencv-python-headless>=4.9
+numpy>=1.24
 rapidfuzz>=3.9
 
-# Security + export
+# --- Keamanan ------------------------------------------------
 argon2-cffi>=23.1
-openpyxl>=3.1
-httpx>=0.27
 
-# Timezone
+# --- Export --------------------------------------------------
+openpyxl>=3.1
+
+# --- Timezone ------------------------------------------------
 tzdata

@@ -1,4 +1,6 @@
-"""Halaman pengaturan: ganti password dan info sistem."""
+"""Halaman pengaturan: ganti password, hapus akun, dan info sistem."""
+
+import logging
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
@@ -8,7 +10,17 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.db import get_db
-from app.models import Merchant, Transaction, UserSession
+from app.models import (
+    Account,
+    AuditLog,
+    Budget,
+    Category,
+    LoginAttempt,
+    Merchant,
+    Transaction,
+    User,
+    UserSession,
+)
 from app.schemas import PasswordInput
 from app.security import (
     COOKIE_NAME,
@@ -18,6 +30,8 @@ from app.security import (
     verify_password,
 )
 from app.templating import templates
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -91,42 +105,38 @@ def delete_account(
     user=Depends(require_user),
 ):
     check_origin(request)
-    
+
     if not password or not confirm_password:
         return RedirectResponse("/settings?flash=missing_fields", status_code=303)
-    
+
     if password != confirm_password:
         return RedirectResponse("/settings?flash=password_mismatch", status_code=303)
-    
+
     if not verify_password(password, user.password_hash):
         return RedirectResponse("/settings?flash=wrong_password", status_code=303)
-    
-    # HARD DELETE all data (clean slate for new user)
-    from app.models import Transaction, Budget, Account, Merchant, AuditLog, LoginAttempt
-    from sqlalchemy import text
-    
+
+    # Hapus seluruh data aplikasi, lalu arahkan ke halaman daftar.
+    # Urutannya penting: tabel yang mereferensikan tabel lain dihapus lebih dulu
+    # supaya tidak kena FOREIGN KEY constraint.
     try:
-        # Disable foreign key checks temporarily (SQLite)
-        db.execute(text("PRAGMA foreign_keys = OFF"))
-        
-        # Delete all data in correct order
-        db.execute(text("DELETE FROM audit_logs"))
-        db.execute(text("DELETE FROM budgets"))
-        db.execute(text("DELETE FROM transactions"))
-        db.execute(text("DELETE FROM merchants"))
-        db.execute(text("DELETE FROM accounts"))
-        db.execute(text("DELETE FROM user_sessions"))
-        db.execute(text("DELETE FROM login_attempts"))
-        db.execute(text("DELETE FROM users"))
-        
-        # Re-enable foreign key checks
-        db.execute(text("PRAGMA foreign_keys = ON"))
-        
+        db.execute(delete(AuditLog))
+        db.execute(delete(Budget))
+        db.execute(delete(Transaction))
+        db.execute(delete(Merchant))
+        db.execute(delete(Account))
+        db.execute(delete(Category))
+        db.execute(delete(UserSession))
+        db.execute(delete(LoginAttempt))
+        db.execute(delete(User))
         db.commit()
-    except Exception as e:
+    except Exception:
         db.rollback()
-        print(f"Error deleting account: {e}")
+        logger.exception("Gagal menghapus data akun")
         return RedirectResponse("/settings?flash=error", status_code=303)
+
+    response = RedirectResponse("/register?flash=deleted", status_code=303)
+    response.delete_cookie(COOKIE_NAME, path="/")
+    return response
     
     response = RedirectResponse("/register?flash=deleted", status_code=303)
     response.delete_cookie(COOKIE_NAME, path="/")
