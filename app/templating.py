@@ -45,6 +45,7 @@ FLASH_MESSAGES = {
 
 templates.env.globals.update(
     app_name=settings.app_name,
+    app_version=settings.app_version,
     format_idr=format_idr,
     format_idr_compact=format_idr_compact,
     format_dt=format_dt,

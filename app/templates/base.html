@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#f3efe6">
-  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-  <link rel="apple-touch-icon" href="/static/favicon.svg">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v={{ app_version }}">
+  <link rel="apple-touch-icon" href="/static/favicon.svg?v={{ app_version }}">
   <title>{% block title %}{{ app_name }}{% endblock %}</title>
-  <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="/static/app.css?v={{ app_version }}">
   <style>
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
@@ -76,6 +76,7 @@
       </a>
     </nav>
 
+    <div class="sidebar-version">v{{ app_version }}</div>
     <form class="sidebar-footer" method="post" action="/logout">
       <button class="btn btn-ghost btn-block" type="submit">Keluar</button>
     </form>
@@ -150,7 +151,7 @@ window.alert = function(message) {
 };
 </script>
 
-<script src="/static/app.js"></script>
-<script src="/static/loading.js"></script>
+<script src="/static/app.js?v={{ app_version }}"></script>
+<script src="/static/loading.js?v={{ app_version }}"></script>
 </body>
 </html>

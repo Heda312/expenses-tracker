@@ -82,6 +82,10 @@
 
       <div class="info-list">
         <div class="info-row">
+          <span>Versi aplikasi</span>
+          <span class="muted num">v{{ app_version }}</span>
+        </div>
+        <div class="info-row">
           <span>Bot Telegram</span>
           <span class="badge {% if telegram_active %}badge-ok{% else %}badge-off{% endif %}">
             {{ 'Aktif' if telegram_active else 'Belum diatur' }}

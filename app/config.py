@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "Catat"
+    app_version: str = "1.3.0"
     secret_key: str = "ganti-dengan-string-acak-panjang"
 
     # Database SQLite disimpan di folder data/ supaya gampang di-backup.

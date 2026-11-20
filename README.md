@@ -588,7 +588,7 @@ python -m uvicorn app.main:app --port 8080
 
 ## Changelog
 
-Lihat **[CHANGELOG.md](CHANGELOG.md)** dan **[RELEASE_NOTES_v1.2.0.md](RELEASE_NOTES_v1.2.0.md)**.
+Lihat **[CHANGELOG.md](CHANGELOG.md)** dan **[RELEASE_NOTES_v1.3.0.md](RELEASE_NOTES_v1.3.0.md)**.
 
 ---
 
