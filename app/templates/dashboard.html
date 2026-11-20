@@ -129,28 +129,49 @@
     <div class="card">
       <div class="card-head">
         <div>
-          <h2 class="card-title">Informasi Keuangan Lainnya</h2>
-          <p class="card-sub">Skor kesehatan dan ringkasan periode</p>
+          <h2 class="card-title">Ringkasan Periode</h2>
+          <p class="card-sub">Angka kunci {{ period.label|lower }}</p>
         </div>
       </div>
-      <div class="stack">
+      <div class="stack period-rows">
         <div class="list-row">
-          <span class="list-title">Skor kesehatan keuangan</span>
+          <span class="list-title">Savings rate</span>
+          <strong class="num {% if summary.savings_rate is not none and summary.savings_rate < 0 %}neg{% endif %}">
+            {% if summary.savings_rate is not none %}{{ summary.savings_rate }}%{% else %}–{% endif %}
+          </strong>
+        </div>
+        <div class="list-row">
+          <span class="list-title">Aman dibelanjakan / hari</span>
           <div class="list-right">
-            <strong class="num" style="color: var(--{{ health.color }})">{{ health.emoji }} {{ health.score }}/{{ health.grade }}</strong>
+            {% if summary.safe_per_day is not none %}
+              <strong class="num">{{ format_idr(summary.safe_per_day) }}</strong>
+              <span class="hint">sisa {{ summary.remaining_days }} hari</span>
+            {% else %}
+              <strong class="num muted">–</strong>
+            {% endif %}
           </div>
         </div>
         <div class="list-row">
+          <span class="list-title">Rata-rata pengeluaran harian</span>
+          <div class="list-right">
+            <strong class="num">{{ format_idr(summary.daily_average) }}</strong>
+            {% if summary.projected_expense %}
+              <span class="hint">proyeksi {{ format_idr_compact(summary.projected_expense) }}</span>
+            {% endif %}
+          </div>
+        </div>
+        {% if summary.biggest %}
+        <div class="list-row">
+          <span class="list-title">Transaksi terbesar</span>
+          <div class="list-right">
+            <strong class="num">{{ format_idr(summary.biggest.amount) }}</strong>
+            <span class="hint">{{ summary.biggest.label }} · {{ format_date(summary.biggest.occurred_at) }}</span>
+          </div>
+        </div>
+        {% endif %}
+        <div class="list-row">
           <span class="list-title">Total transaksi</span>
           <strong class="num">{{ summary.count }} transaksi</strong>
-        </div>
-        <div class="list-row">
-          <span class="list-title">Jumlah kategori</span>
-          <strong class="num">{{ categories|length }} kategori</strong>
-        </div>
-        <div class="list-row">
-          <span class="list-title">Rata-rata transaksi</span>
-          <strong class="num">{{ format_idr(summary.average_transaction) }}</strong>
         </div>
         <div class="list-row">
           <span class="list-title">Hari aktif</span>
@@ -248,7 +269,7 @@
       {% if categories %}
         <div class="donut-wrap">
           <svg class="donut" viewBox="0 0 100 100" role="img" aria-label="Komposisi pengeluaran">
-            <circle cx="50" cy="50" r="40" fill="none" stroke="#1b212c" stroke-width="13"/>
+            <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(63,82,58,0.12)" stroke-width="13"/>
             {% for segment in donut %}
               <circle cx="50" cy="50" r="40" fill="none"
                       stroke="{{ segment.color }}" stroke-width="13"

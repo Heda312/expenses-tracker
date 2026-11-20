@@ -7,9 +7,7 @@ Urutan:
   4. "Lainnya"
 
 Semakin sering dipakai, lapis 1 dan 3 semakin banyak terisi sehingga
-LLM makin jarang dipanggil.
-
-Deprecated: LLM removed. OCR/parser only.
+klasifikasi makin akurat tanpa biaya komputasi tambahan.
 """
 
 import re
@@ -65,7 +63,6 @@ async def classify_category(
     db: Session,
     merchant_raw: str | None,
     text: str = "",
-    use_llm: bool = True,
     kind: str = "expense",
 ) -> tuple[int | None, str]:
     """Tentukan category_id dan sumbernya."""

@@ -3,14 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="color-scheme" content="dark">
-    <meta name="theme-color" content="#21133f">
-    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-    <link rel="apple-touch-icon" href="/static/favicon.svg">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#f3efe6">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="apple-touch-icon" href="/static/favicon.svg">
   <title>{% block title %}{{ app_name }}{% endblock %}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/app.css">
   <style>
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -20,7 +17,7 @@
 <div class="shell">
   <aside class="sidebar">
     <div class="brand">
-      <span class="brand-mark" aria-hidden="true">H</span>
+      <span class="brand-mark" aria-hidden="true">C</span>
       <div class="brand-name">
         <span>{{ app_name }}</span>
         <span class="brand-sub">Pengeluaran Pribadi</span>
@@ -87,10 +84,6 @@
    <main class="main">
      <div class="page-decoration page-decoration-one" aria-hidden="true"></div>
      <div class="page-decoration page-decoration-two" aria-hidden="true"></div>
-     <header class="mobile-brand" aria-label="Catat">
-       <span class="brand-mark" aria-hidden="true">H</span>
-       <strong>{{ app_name }}</strong>
-     </header>
     {% set flash_key = request.query_params.get('flash') %}
     {% if flash_key and flash_key in flash_messages %}
       {% set flash_kind, flash_text = flash_messages[flash_key] %}
@@ -123,109 +116,6 @@
     <button class="alert-close" onclick="closeAlert()">×</button>
   </div>
 </div>
-
-<style>
-/* Background decoration */
-body::before {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: 
-    radial-gradient(circle at 20% 50%, rgba(59, 130, 246, 0.03) 0%, transparent 50%),
-    radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.03) 0%, transparent 50%);
-  pointer-events: none;
-  z-index: -1;
-}
-
-/* Alert Modal */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0,0,0,0.5);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10000;
-  animation: fadeIn 0.2s;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.alert-box {
-  background: var(--surface);
-  border-radius: 16px;
-  padding: 2rem;
-  max-width: 400px;
-  width: 90%;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-  position: relative;
-  animation: slideUp 0.3s;
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.alert-icon {
-  font-size: 3rem;
-  text-align: center;
-  margin-bottom: 1rem;
-}
-
-.alert-content h3 {
-  margin: 0 0 0.5rem 0;
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  text-align: center;
-}
-
-.alert-content p {
-  margin: 0;
-  color: var(--text-secondary);
-  text-align: center;
-  line-height: 1.5;
-}
-
-.alert-close {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  color: var(--text-secondary);
-  cursor: pointer;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  transition: background 0.2s;
-}
-
-.alert-close:hover {
-  background: rgba(0,0,0,0.05);
-}
-</style>
 
 <script>
 // Global alert function

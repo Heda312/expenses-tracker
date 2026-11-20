@@ -37,7 +37,7 @@
   <dialog id="alert-dialog">
     <div class="dialog-head">
       <div style="display:flex;align-items:center;gap:10px">
-        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#f59e0b">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--warn)">
           <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
           <line x1="12" y1="9" x2="12" y2="13"/>
           <line x1="12" y1="17" x2="12.01" y2="17"/>
@@ -61,7 +61,7 @@
       <button class="btn btn-icon btn-ghost" type="button" onclick="closeUploadPreview()" aria-label="Tutup">&times;</button>
     </div>
     <!-- Loading overlay (disembunyikan default; app.js mengubah ke flex saat OCR) -->
-    <div id="upload-loading" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;z-index:10">
+    <div id="upload-loading" style="display:none;position:absolute;inset:0;background:rgba(38,51,31,0.35);backdrop-filter:blur(3px);align-items:center;justify-content:center;z-index:10">
       <div style="color:white;font-size:16px;text-align:center">
         <span class="loading" style="width:40px;height:40px;border-width:4px;margin:0 auto 10px;display:block"></span>
         Memindai struk...

@@ -102,7 +102,7 @@ async def ocr_endpoint(
     account = _pick_account(accounts, raw_text)
     kind = "income" if income else "expense"
     category_id, _category_source = await classify.classify_category(
-        db, data.merchant, raw_text, use_llm=False, kind=kind
+        db, data.merchant, raw_text, kind=kind
     )
 
     parsed_time = parse_time(raw_text)

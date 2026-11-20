@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import Account, Category, Transaction
+from app.models import Account, Category, Transaction, category_color
 from app.services import wallet
 from app.services.dates import TZ, to_utc
 from app.services.money import parse_amount
@@ -261,7 +261,7 @@ def _get_or_create_category(db: Session, name: str, kind: str) -> tuple[Category
     if existing is not None:
         return existing, False
 
-    category = Category(name=clean[:60], kind=kind)
+    category = Category(name=clean[:60], kind=kind, color=category_color(clean))
     db.add(category)
     db.flush()
     return category, True

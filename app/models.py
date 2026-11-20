@@ -57,13 +57,27 @@ import hashlib
 
 
 def category_color(name: str) -> str:
-    """Generate stable random color from category name (hex #RRGGBB)."""
+    """Warna stabil per nama kategori, dipilih dari palet earthy.
+
+    Palet curated supaya donut/legend tetap harmonis dengan tema
+    beige × green, bukan RGB acak yang sering bertabrakan.
+    """
+    palette = [
+        "#3e7a4e",  # sage deep
+        "#6f9a6b",  # sage
+        "#a3a857",  # olive
+        "#c99a3f",  # amber
+        "#c26a4a",  # terracotta
+        "#b76e79",  # rose
+        "#8a6a8f",  # plum
+        "#6a7fa3",  # slate blue
+        "#4f8a8b",  # teal
+        "#2f6b45",  # pine
+        "#7d8f69",  # moss
+        "#c9b48a",  # sand
+    ]
     h = hashlib.md5(name.encode()).hexdigest()
-    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
-    # Skip too dark colors
-    if r + g + b < 100:
-        r, g, b = 200, 200, 200
-    return f"#{r:02x}{g:02x}{b:02x}"
+    return palette[int(h[:8], 16) % len(palette)]
 
 
 class Category(Base):

@@ -15,7 +15,7 @@ os.environ["DATABASE_URL"] = f"sqlite:///{TEMP_DB.as_posix()}"
 
 from sqlalchemy import func, select  # noqa: E402
 
-from app.bot import _answer_finance_question, _handle_info_query  # noqa: E402
+from app.bot.queries import _answer_finance_question, _handle_info_query  # noqa: E402
 from app.db import SessionLocal, engine  # noqa: E402
 from app.models import Account, Base, Budget, Category, Transaction  # noqa: E402
 from app.services.dates import current_period, month_bounds, now_local, to_utc  # noqa: E402

@@ -11,7 +11,7 @@ from datetime import date, datetime, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
-from app.models import Budget, Category, Transaction
+from app.models import Budget, Transaction
 from app.services import ledger
 from app.services.dates import month_bounds, now_local, to_utc, today_local
 from app.services.money import format_idr
@@ -240,68 +240,46 @@ def _budget_totals(db: Session, period: Period) -> dict:
     }
 
 
-def _health_score(summary: dict, budget: dict) -> dict:
-    if not summary["has_data"]:
-        return {
-            "score": 0,
-            "grade": "Belum ada data",
-            "color": "muted",
-            "emoji": "📊",
-            "breakdown": {
-                "budget_discipline": 0,
-                "savings_ability": 0,
-                "income_health": 0,
-                "expense_control": 0,
-            },
-        }
+def _period_extras(db: Session, period: Period, summary: dict) -> dict:
+    """Metrik tambahan untuk kartu Ringkasan Periode.
 
-    income = summary["income"]
-    expense = summary["expense"]
-    savings_rate = summary["savings_rate"] or 0
+    - projected_expense: proyeksi pengeluaran akhir periode dari rata-rata harian.
+    - safe_per_day: sisa surplus yang aman dibelanjakan per hari tersisa.
+    - biggest: transaksi pengeluaran terbesar pada periode ini.
+    """
+    projected_expense = None
+    safe_per_day = None
+    remaining_days = 0
 
-    savings_score = min(100, max(0, round(savings_rate * 2)))
-    income_score = 100 if income > 0 else 0
-    if income <= 0:
-        control_score = 0
-    elif expense <= income:
-        control_score = 100
-    else:
-        control_score = max(0, round(100 - (expense - income) / income * 100))
+    if period.has_range:
+        today = today_local()
+        if period.start_date <= today <= period.end_date:
+            remaining_days = (period.end_date - today).days + 1
+            projected_expense = summary["daily_average"] * summary["calendar_days"]
+            if remaining_days > 0:
+                safe_per_day = max(summary["net"], 0) // remaining_days
 
-    if budget["has_budget"] and budget["rows"]:
-        over_ratio = budget["over_count"] / len(budget["rows"])
-        usage = budget["pct"] or 0
-        budget_score = max(0, round(100 - over_ratio * 100 - max(0, usage - 100) * 0.5))
-    else:
-        budget_score = 50  # netral kalau belum ada budget
+    conditions = [Transaction.kind == "expense", *ACTIVE]
+    if period.has_range:
+        conditions += [Transaction.occurred_at >= period.start, Transaction.occurred_at < period.end]
+    row = db.scalars(
+        select(Transaction)
+        .options(joinedload(Transaction.category))
+        .where(*conditions)
+        .order_by(Transaction.amount.desc(), Transaction.id.desc())
+        .limit(1)
+    ).first()
 
-    overall = round(
-        budget_score * 0.3
-        + savings_score * 0.3
-        + income_score * 0.2
-        + control_score * 0.2
-    )
-
-    if overall >= 80:
-        grade, color, emoji = "Sangat Baik", "income", "💚"
-    elif overall >= 60:
-        grade, color, emoji = "Baik", "accent", "💙"
-    elif overall >= 40:
-        grade, color, emoji = "Cukup", "warn", "💛"
-    else:
-        grade, color, emoji = "Perlu Perbaikan", "expense", "❤️"
+    biggest = None
+    if row is not None:
+        label = row.merchant or (row.category.name if row.category else None) or row.note or "Transaksi"
+        biggest = {"amount": int(row.amount), "label": label, "occurred_at": row.occurred_at}
 
     return {
-        "score": overall,
-        "grade": grade,
-        "color": color,
-        "emoji": emoji,
-        "breakdown": {
-            "budget_discipline": budget_score,
-            "savings_ability": savings_score,
-            "income_health": income_score,
-            "expense_control": control_score,
-        },
+        "projected_expense": projected_expense,
+        "safe_per_day": safe_per_day,
+        "remaining_days": remaining_days,
+        "biggest": biggest,
     }
 
 
@@ -427,10 +405,10 @@ def _category_totals(db: Session, period: Period, limit: int = 8) -> list[dict]:
 def build_dashboard(db: Session, period: Period) -> dict:
     """Kumpulkan semua data yang dipakai template dashboard."""
     summary = _period_summary(db, period)
+    summary.update(_period_extras(db, period, summary))
     comparison = _comparison(db, period, summary)
     budget = _budget_totals(db, period)
     categories = _category_totals(db, period)
-    health = _health_score(summary, budget)
     insights = _insights(summary, comparison, budget, categories)
 
     balances = ledger.account_balances(db)
@@ -455,7 +433,6 @@ def build_dashboard(db: Session, period: Period) -> dict:
         "period": period,
         "summary": summary,
         "comparison": comparison,
-        "health": health,
         "budget": budget,
         "insights": insights,
         "categories": categories,

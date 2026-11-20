@@ -3,6 +3,30 @@
 Semua perubahan penting pada Catat didokumentasikan di file ini.
 Format mengikuti Keep a Changelog dan project mengikuti Semantic Versioning.
 
+## [1.3.0] - 2026-11-20
+
+### Changed
+
+- Redesign UI: tema glassmorphism beige × hijau (light only), font sistem tanpa Google Fonts, favicon dan brand mark "C" baru.
+- Dashboard: kartu "Informasi Keuangan Lainnya" diganti "Ringkasan Periode" (savings rate, aman dibelanjakan per hari, rata-rata harian + proyeksi, transaksi terbesar, total transaksi, hari aktif).
+- Refactor: `app/bot.py` (2.667 baris) dipecah menjadi package `app/bot/` (15 modul); urutan registrasi handler dipertahankan persis.
+- OCR: RapidOCR (ONNX) menjadi satu-satunya engine; strategi dua pass (raw → preprocess) dipertahankan.
+- Dockerfile: library apt dipangkas ke kebutuhan runtime OCR saja.
+- Warna kategori: palet earthy terkurasi, konsisten antara donut, legend, dan daftar kategori; kategori baru dari bot/import/API otomatis mendapat warna.
+- Style inline di template base & categories dipindah ke `app.css` dengan design token.
+
+### Removed
+
+- Dependensi EasyOCR dan PyTorch (image Docker turun drastis).
+- Dead code: `services/llm.py`, `services/analytics.py`, `routers/dashboard_new.py`, parameter `use_llm`, dan skor kesehatan keuangan.
+- Header brand duplikat di layout mobile.
+
+### Fixed
+
+- Modal alert & kategori sebelumnya memakai variabel CSS yang tidak terdefinisi sehingga tampil tanpa style.
+- Halaman login/register/setup masih memakai meta dark theme dan brand mark lama.
+- Label baris Ringkasan Periode terpotong ellipsis di layar sempit; kini wrap rapi.
+
 ## [1.2.0] - 2026-11-07
 
 ### Added

@@ -1,5 +1,5 @@
 # ============================================================
-# Catat v1.2.0 — Runtime dependencies
+# Catat v1.3.0 — Runtime dependencies
 # Python 3.11+ (diuji di 3.11 & 3.12)
 # Install: pip install -r requirements.txt
 # ============================================================
@@ -20,10 +20,8 @@ pydantic-settings>=2.3
 aiogram>=3.13,<4
 
 # --- OCR + parsing -------------------------------------------
-# rapidocr-onnxruntime: engine utama (Windows & Linux)
-# easyocr: fallback lintas platform (butuh RAM lebih besar)
+# rapidocr-onnxruntime: satu-satunya engine OCR (ringan, tanpa PyTorch)
 rapidocr-onnxruntime>=1.4,<1.5
-easyocr>=1.7,<2
 opencv-python-headless>=4.9
 numpy>=1.24
 rapidfuzz>=3.9

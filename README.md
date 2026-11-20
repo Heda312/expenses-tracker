@@ -4,7 +4,7 @@
 
 Input transaksi lewat chat, foto struk (OCR), atau web. Saldo dompet dihitung otomatis dari transaksi. Semua data tersimpan lokal di SQLite.
 
-**Versi:** 1.2.0 &nbsp;·&nbsp; **Lisensi:** MIT &nbsp;·&nbsp; **Python:** 3.11+
+**Versi:** 1.3.0 &nbsp;·&nbsp; **Lisensi:** MIT &nbsp;·&nbsp; **Python:** 3.11+
 
 ---
 
@@ -80,7 +80,7 @@ Input transaksi lewat chat, foto struk (OCR), atau web. Saldo dompet dihitung ot
 | Web | FastAPI + Jinja2 + Uvicorn |
 | Database | SQLite + SQLAlchemy 2.x + Alembic |
 | Bot | aiogram 3.x |
-| OCR | RapidOCR (ONNX) + EasyOCR (fallback) |
+| OCR | RapidOCR (ONNX) |
 | Parsing | rapidfuzz + regex |
 | Keamanan | Argon2id + session cookie |
 | Export | openpyxl (Excel), csv |
@@ -139,7 +139,7 @@ python -m uvicorn app.main:app --reload
 ### Catatan Windows
 
 - OCR butuh **Visual C++ Redistributable**; tanpa itu RapidOCR gagal dimuat
-  (aplikasi tetap jalan, OCR akan fallback ke EasyOCR).
+  dan fitur OCR tidak tersedia (fitur lain tetap jalan).
 - Kalau aktivasi venv diblokir, jalankan sekali:
   `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
 - Port 8000 dipakai proses lain? Ganti: `--port 8080`
@@ -435,7 +435,22 @@ Setelah import, saldo semua dompet dihitung ulang otomatis.
 expenses/
 ├── app/
 │   ├── main.py              # Entry point FastAPI
-│   ├── bot.py               # Telegram bot
+│   ├── bot/                 # Telegram bot (package)
+│   │   ├── __init__.py      # Router tunggal + start_bot (urutan import = urutan handler)
+│   │   ├── common.py        # Guard chat & helper bersama
+│   │   ├── keyboards.py     # Inline keyboard
+│   │   ├── render.py        # Format pesan
+│   │   ├── queries.py       # Query laporan & NLU teks
+│   │   ├── transactions.py  # Catat/edit transaksi + import CSV
+│   │   ├── categories.py    # Perintah kategori
+│   │   ├── categories_callbacks.py # Callback kategori
+│   │   ├── budgets.py       # Perintah budget
+│   │   ├── budgets_callbacks.py    # Callback budget
+│   │   ├── reports.py       # Laporan totals/harian/mingguan/bulanan
+│   │   ├── delete_flow.py   # Alur hapus transaksi
+│   │   ├── edit_amount.py   # Edit nominal cepat
+│   │   ├── media.py         # Foto struk → OCR
+│   │   └── text.py          # Handler teks bebas
 │   ├── models.py            # Model SQLAlchemy
 │   ├── schemas.py           # Validasi Pydantic
 │   ├── config.py            # Konfigurasi dari .env
@@ -461,7 +476,6 @@ expenses/
 │   │   ├── export_formats.py# Format CSV
 │   │   ├── ledger.py        # Agregasi laporan
 │   │   ├── dashboard.py     # Data dashboard
-│   │   ├── analytics.py     # Insight
 │   │   ├── periods.py       # Resolusi periode
 │   │   ├── dates.py         # Util tanggal & timezone
 │   │   ├── money.py         # Parsing nominal rupiah
@@ -543,7 +557,8 @@ docker compose start app
 
 - **Windows:** install [VC++ Redistributable x64](https://aka.ms/vs/17/release/vc_redist.x64.exe)
 - **Docker/Linux:** pastikan `libgomp1 libgl1 libglib2.0-0` terpasang
-- Aplikasi otomatis fallback ke EasyOCR kalau RapidOCR gagal
+- Sejak v1.3.0 hanya RapidOCR yang dipakai (EasyOCR dihapus demi image yang
+  jauh lebih ringan). Pastikan dependensi sistem di atas terpasang.
 
 ### Import CSV gagal
 
@@ -583,4 +598,4 @@ MIT — lihat [LICENSE](LICENSE).
 
 ## Kredit
 
-Dibangun dengan FastAPI, aiogram, SQLAlchemy, RapidOCR, dan EasyOCR.
+Dibangun dengan FastAPI, aiogram, SQLAlchemy, dan RapidOCR.

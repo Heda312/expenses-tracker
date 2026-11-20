@@ -224,7 +224,7 @@ def create_transaction(
             return _back(selected, "invalid")
         data.category_id = None
     elif data.category_id is None:
-        data.category_id, _ = asyncio.run(classify.classify_category(db, data.merchant, f"{data.merchant or ''} {data.note or ''}", kind=data.kind, use_llm=False))
+        data.category_id, _ = asyncio.run(classify.classify_category(db, data.merchant, f"{data.merchant or ''} {data.note or ''}", kind=data.kind))
 
     transaction = Transaction(
         **data.model_dump(),
@@ -292,7 +292,7 @@ def update_transaction(
     if data.kind == "transfer" and (not data.to_account_id or data.to_account_id == data.account_id):
         return _back(selected, "invalid")
     if data.kind != "transfer" and data.category_id is None:
-        data.category_id, _ = asyncio.run(classify.classify_category(db, data.merchant, f"{data.merchant or ''} {data.note or ''}", kind=data.kind, use_llm=False))
+        data.category_id, _ = asyncio.run(classify.classify_category(db, data.merchant, f"{data.merchant or ''} {data.note or ''}", kind=data.kind))
 
     before = _snapshot(transaction)
 

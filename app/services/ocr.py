@@ -1,11 +1,14 @@
-"""OCR engine wrapper using RapidOCR."""
+"""OCR engine wrapper using RapidOCR (ONNX).
+
+Satu engine saja: RapidOCR. Preprocessing (upscale + CLAHE) dipakai sebagai
+percobaan kedua kalau gambar mentah menghasilkan terlalu sedikit teks.
+"""
 import logging
 
 logger = logging.getLogger(__name__)
 
 _engine = None
 _engine_error = None
-_easy_engine = None
 
 
 class OcrError(RuntimeError):
@@ -35,65 +38,25 @@ def _get_engine():
     return _engine
 
 
-def _get_easy_engine():
-    """Fallback OCR cross-platform memakai EasyOCR."""
-    global _easy_engine
-    if _easy_engine is None:
-        try:
-            import easyocr
-            logger.info("Memuat model EasyOCR...")
-            _easy_engine = easyocr.Reader(["id", "en"], gpu=False, verbose=False)
-            logger.info("Model EasyOCR siap.")
-        except Exception as exc:
-            raise OcrError(f"EasyOCR tidak bisa dimuat: {exc}") from exc
-    return _easy_engine
+def _decode(image_bytes: bytes):
+    import cv2
+    import numpy as np
+
+    image = cv2.imdecode(np.frombuffer(image_bytes, dtype=np.uint8), cv2.IMREAD_COLOR)
+    if image is None:
+        raise OcrError("Gambar tidak bisa dibaca.")
+    return image
 
 
-def _run_easyocr(image_bytes: bytes):
-    """Jalankan EasyOCR tanpa dependency binary khusus OS."""
-    try:
-        import cv2
-        import numpy as np
-
-        image = cv2.imdecode(np.frombuffer(image_bytes, dtype=np.uint8), cv2.IMREAD_COLOR)
-        if image is None:
-            raise OcrError("Gambar tidak bisa dibaca.")
-        result = _get_easy_engine().readtext(image, detail=1, paragraph=False)
-        lines = []
-        for box, text, score in result or []:
-            text = str(text).strip()
-            if text:
-                xs = [point[0] for point in box]
-                ys = [point[1] for point in box]
-                lines.append({
-                    "text": text,
-                    "top": float(min(ys)),
-                    "left": float(min(xs)),
-                    "height": float(max(ys) - min(ys)),
-                    "score": float(score),
-                })
-        return lines
-    except OcrError:
-        raise
-    except Exception as exc:
-        raise OcrError(f"EasyOCR gagal: {exc}") from exc
-
-
-def _run_ocr(image_bytes: bytes):
+def _run_ocr(image):
+    """Jalankan RapidOCR pada array gambar atau bytes mentah."""
     engine = _get_engine()
     try:
-        import cv2
-        import numpy as np
-
-        if isinstance(image_bytes, bytes):
-            image = cv2.imdecode(
-                np.frombuffer(image_bytes, dtype=np.uint8), cv2.IMREAD_COLOR
-            )
-            if image is None:
-                raise OcrError("Gambar tidak bisa dibaca.")
-        else:
-            image = image_bytes
+        if isinstance(image, bytes):
+            image = _decode(image)
         result, _ = engine(image)
+    except OcrError:
+        raise
     except Exception as exc:
         raise OcrError(f"OCR gagal: {exc}") from exc
 
@@ -117,7 +80,8 @@ def _run_ocr(image_bytes: bytes):
                     "score": float(score),
                 }
             )
-        except Exception:
+        except Exception:  # noqa: BLE001 - box OCR rusak dilewati, bukan fatal
+            logger.debug("Box OCR tidak valid, dilewati", exc_info=True)
             continue
 
     lines.sort(key=lambda line: (line["top"], line["left"]))
@@ -125,13 +89,10 @@ def _run_ocr(image_bytes: bytes):
 
 
 def _preprocess(image_bytes: bytes):
+    """Upscale gambar kecil + tingkatkan kontras lokal (CLAHE)."""
     import cv2
-    import numpy as np
 
-    array = np.frombuffer(image_bytes, dtype=np.uint8)
-    image = cv2.imdecode(array, cv2.IMREAD_COLOR)
-    if image is None:
-        raise OcrError("Gambar tidak bisa dibaca.")
+    image = _decode(image_bytes)
 
     h, w = image.shape[:2]
     max_side = max(h, w)
@@ -144,34 +105,29 @@ def _preprocess(image_bytes: bytes):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     gray = cv2.bilateralFilter(gray, 7, 75, 75)
     clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
-    gray = clahe.apply(gray)
-    return gray
+    return clahe.apply(gray)
 
 
 def read_lines(image_bytes: bytes) -> list[dict]:
     """Baca gambar, kembalikan daftar baris teks beserta posisinya."""
     all_lines = []
-    # Try raw image first (more lenient)
+    # Coba gambar mentah dulu (lebih toleran terhadap struk berwarna).
     try:
         all_lines = _run_ocr(image_bytes)
         if len(all_lines) >= 3:
             return all_lines
+    except OcrError:
+        raise
     except Exception:
-        pass
+        logger.debug("OCR gambar mentah gagal, coba preprocessing.", exc_info=True)
 
+    # Percobaan kedua: gambar yang sudah dipertajam.
     try:
-        img = _preprocess(image_bytes)
-        all_lines = _run_ocr(img)
-        if len(all_lines) >= 3:
-            return all_lines
+        all_lines = _run_ocr(_preprocess(image_bytes))
+    except OcrError:
+        raise
     except Exception:
-        pass
-
-    if not all_lines:
-        try:
-            all_lines = _run_easyocr(image_bytes)
-        except OcrError as exc:
-            logger.warning("OCR fallback gagal: %s", exc)
+        logger.debug("OCR dengan preprocessing gagal.", exc_info=True)
 
     if not all_lines:
         raise OcrError("Tidak ada teks yang terbaca dari gambar ini.")
